@@ -1,182 +1,158 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react';
 import {
-  Grid,
-  Paper,
-  Typography,
   Box,
-  CircularProgress,
+  Container,
+  Grid,
   Card,
   CardContent,
+  Typography,
+  Button,
+  Alert,
+  Paper,
   Chip,
-} from '@mui/material'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+} from '@mui/material';
+import {
+  Storage,
+  Speed,
+  Timeline,
+  Settings as SettingsIcon,
+} from '@mui/icons-material';
+import { useAuth } from '../contexts/AuthContext';
+import Header from './Header';
 
-const Dashboard: React.FC = () => {
-  const [loading, setLoading] = useState(true)
-  
-  // Mock data para demonstração
-  const [metrics] = useState({
-    connections: { active: 45, max: 100, trend: 'stable', status: 'healthy' },
-    database: { size: 2147483648, growth_trend: 'up' },
-    performance: { queries_per_second: 150, trend: 'up', status: 'healthy' },
-    system: { cpu_percent: 25.5, cpu_trend: 'stable', cpu_status: 'healthy' }
-  })
+const Dashboard = () => {
+  const { user } = useAuth();
+  const [selectedDatabase, setSelectedDatabase] = useState<string | null>(null);
 
-  const [historicalData] = useState([
-    { timestamp: '10:00', connections: 40, queries_per_second: 120 },
-    { timestamp: '10:05', connections: 42, queries_per_second: 135 },
-    { timestamp: '10:10', connections: 45, queries_per_second: 150 },
-    { timestamp: '10:15', connections: 43, queries_per_second: 145 },
-    { timestamp: '10:20', connections: 47, queries_per_second: 160 },
-  ])
+  const mockDatabases = [
+    { name: 'production_db', status: 'online', size: '2.3 GB', connections: 45 },
+    { name: 'staging_db', status: 'online', size: '856 MB', connections: 8 },
+    { name: 'analytics_db', status: 'maintenance', size: '4.1 GB', connections: 0 },
+  ];
 
-  useEffect(() => {
-    // Simular carregamento
-    setTimeout(() => setLoading(false), 1000)
-  }, [])
-
-  const formatBytes = (bytes: number) => {
-    return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB'
-  }
-
-  if (loading) {
-    return (
-      <Box className="loading-spinner">
-        <CircularProgress />
-        <Typography variant="body1" sx={{ ml: 2 }}>
-          Loading metrics...
-        </Typography>
-      </Box>
-    )
-  }
+  const mockMetrics = [
+    { title: 'Active Connections', value: '53', icon: <Speed /> },
+    { title: 'Database Size', value: '7.3 GB', icon: <Storage /> },
+    { title: 'Queries/sec', value: '1,247', icon: <Timeline /> },
+  ];
 
   return (
-    <Box>
-      <Typography variant="h4" gutterBottom>
-        PostgreSQL Dashboard
-      </Typography>
+    <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50' }}>
+      <Header />
+      
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        {/* Welcome Section */}
+        <Box sx={{ mb: 4 }}>
+          <Typography variant="h4" gutterBottom>
+            Dashboard
+          </Typography>
+          <Typography variant="body1" color="textSecondary">
+            Bem-vindo, {user?.full_name}! Monitore suas bases de dados PostgreSQL.
+          </Typography>
+        </Box>
 
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card className="metric-card">
-            <CardContent>
-              <Typography color="textSecondary" gutterBottom>
-                Active Connections
-              </Typography>
-              <Typography variant="h4" component="div">
-                {metrics.connections.active}
-              </Typography>
-              <Typography variant="body2" color="textSecondary">
-                Max: {metrics.connections.max}
-              </Typography>
-              <Chip label={metrics.connections.status} color="success" size="small" />
-            </CardContent>
-          </Card>
-        </Grid>
-
-        <Grid item xs={12} sm={6} md={3}>
-          <Card className="metric-card">
-            <CardContent>
-              <Typography color="textSecondary" gutterBottom>
-                Database Size
-              </Typography>
-              <Typography variant="h4" component="div">
-                {formatBytes(metrics.database.size)}
-              </Typography>
-              <Typography variant="body2" color="textSecondary">
-                Total Size
-              </Typography>
-              <Chip label="healthy" color="success" size="small" />
-            </CardContent>
-          </Card>
+        {/* Metrics Cards */}
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+          {mockMetrics.map((metric, index) => (
+            <Grid item xs={12} sm={6} md={4} key={index}>
+              <Card>
+                <CardContent>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                    {metric.icon}
+                    <Typography variant="h6" sx={{ ml: 1 }}>
+                      {metric.title}
+                    </Typography>
+                  </Box>
+                  <Typography variant="h3" color="primary">
+                    {metric.value}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+          ))}
         </Grid>
 
-        <Grid item xs={12} sm={6} md={3}>
-          <Card className="metric-card">
-            <CardContent>
-              <Typography color="textSecondary" gutterBottom>
-                Queries/sec
-              </Typography>
-              <Typography variant="h4" component="div">
-                {metrics.performance.queries_per_second}
-              </Typography>
-              <Typography variant="body2" color="textSecondary">
-                Current Rate
-              </Typography>
-              <Chip label={metrics.performance.status} color="success" size="small" />
-            </CardContent>
-          </Card>
-        </Grid>
+        {/* Database List */}
+        <Paper sx={{ p: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            Bases de Dados
+          </Typography>
+          
+          <Grid container spacing={2}>
+            {mockDatabases.map((db, index) => (
+              <Grid item xs={12} sm={6} md={4} key={index}>
+                <Card 
+                  sx={{ 
+                    cursor: 'pointer',
+                    border: selectedDatabase === db.name ? 2 : 1,
+                    borderColor: selectedDatabase === db.name ? 'primary.main' : 'grey.300'
+                  }}
+                  onClick={() => setSelectedDatabase(db.name)}
+                >
+                  <CardContent>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                      <Typography variant="h6">{db.name}</Typography>
+                      <Chip 
+                        label={db.status} 
+                        color={db.status === 'online' ? 'success' : 'warning'}
+                        size="small"
+                      />
+                    </Box>
+                    <Typography variant="body2" color="textSecondary">
+                      Tamanho: {db.size}
+                    </Typography>
+                    <Typography variant="body2" color="textSecondary">
+                      Conexões: {db.connections}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
 
-        <Grid item xs={12} sm={6} md={3}>
-          <Card className="metric-card">
-            <CardContent>
-              <Typography color="textSecondary" gutterBottom>
-                CPU Usage
-              </Typography>
-              <Typography variant="h4" component="div">
-                {metrics.system.cpu_percent.toFixed(1)}%
-              </Typography>
-              <Typography variant="body2" color="textSecondary">
-                Current Usage
-              </Typography>
-              <Chip label={metrics.system.cpu_status} color="success" size="small" />
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+          {selectedDatabase && (
+            <Alert severity="info" sx={{ mt: 3 }}>
+              Base selecionada: <strong>{selectedDatabase}</strong>
+              <br />
+              <Button 
+                startIcon={<SettingsIcon />} 
+                sx={{ mt: 1 }}
+                variant="outlined"
+                size="small"
+              >
+                Configurar Monitoramento
+              </Button>
+            </Alert>
+          )}
+        </Paper>
 
-      <Grid container spacing={3}>
-        <Grid item xs={12} lg={6}>
-          <Paper sx={{ p: 2 }}>
-            <Typography variant="h6" gutterBottom>
-              Connection History
-            </Typography>
-            <Box className="chart-container">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={historicalData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="timestamp" />
-                  <YAxis />
-                  <Tooltip />
-                  <Line
-                    type="monotone"
-                    dataKey="connections"
-                    stroke="#1976d2"
-                    strokeWidth={2}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </Box>
-          </Paper>
-        </Grid>
-        
-        <Grid item xs={12} lg={6}>
-          <Paper sx={{ p: 2 }}>
-            <Typography variant="h6" gutterBottom>
-              Query Performance
-            </Typography>
-            <Box className="chart-container">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={historicalData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="timestamp" />
-                  <YAxis />
-                  <Tooltip />
-                  <Line
-                    type="monotone"
-                    dataKey="queries_per_second"
-                    stroke="#dc004e"
-                    strokeWidth={2}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </Box>
-          </Paper>
-        </Grid>
-      </Grid>
+        {/* User Info Card */}
+        <Paper sx={{ p: 3, mt: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            Informações da Conta
+          </Typography>
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6}>
+              <Typography variant="body2" color="textSecondary">Nome:</Typography>
+              <Typography variant="body1">{user?.full_name}</Typography>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <Typography variant="body2" color="textSecondary">Email:</Typography>
+              <Typography variant="body1">{user?.email}</Typography>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <Typography variant="body2" color="textSecondary">Usuário:</Typography>
+              <Typography variant="body1">{user?.username}</Typography>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <Typography variant="body2" color="textSecondary">Papel:</Typography>
+              <Chip label={user?.role} color={user?.role === 'ADMIN' ? 'error' : 'default'} />
+            </Grid>
+          </Grid>
+        </Paper>
+      </Container>
     </Box>
-  )
-}
+  );
+};
 
-export default Dashboard
+export default Dashboard;

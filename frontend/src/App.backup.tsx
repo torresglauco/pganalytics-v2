@@ -6,6 +6,7 @@ import ProtectedRoute from './components/auth/ProtectedRoute';
 import LoginForm from './components/auth/LoginForm';
 import RegisterForm from './components/auth/RegisterForm';
 import Dashboard from './components/Dashboard';
+import TestPage from './components/TestPage';
 import './App.css';
 
 const theme = createTheme({
@@ -22,7 +23,16 @@ function App() {
       <CssBaseline />
       <AuthProvider>
         <Router>
-          <Routes><Route path="/" element={
+          <Routes>
+            {/* ROTA DE TESTE */}
+            <Route path="/test" element={<TestPage />} />
+            
+            {/* ROTAS DE AUTH */}
+            <Route path="/login" element={<LoginForm />} />
+            <Route path="/register" element={<RegisterForm />} />
+            
+            {/* ROTAS PROTEGIDAS */}
+            <Route path="/" element={
               <ProtectedRoute>
                 <Dashboard />
               </ProtectedRoute>

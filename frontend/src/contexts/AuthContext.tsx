@@ -1,7 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { api } from '../services/api';
 
-// Interface baseada na resposta real do /me
 interface User {
   id: number;
   username: string;
@@ -27,7 +26,6 @@ interface RegisterData {
   confirm_password: string;
 }
 
-// Interface baseada na resposta real do login
 interface LoginResponse {
   access_token: string;
   refresh_token: string;
@@ -83,6 +81,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       const response = await api.get<User>('/api/v1/auth/me');
       console.log('🔐 Resposta do /me:', response.data);
       setUser(response.data);
+      console.log('🔐 ✅ User definido no contexto');
     } catch (error) {
       console.log('🔐 Erro ao verificar auth:', error);
       logout();
@@ -97,36 +96,31 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     try {
       setIsLoading(true);
       
-      // PASSO 1: Fazer login e obter token
       console.log('🔐 PASSO 1: Fazendo login...');
       const loginResponse = await api.post<LoginResponse>('/api/v1/auth/login', credentials);
       const loginData = loginResponse.data;
       console.log('🔐 Login bem-sucedido, token recebido');
       
-      // PASSO 2: Salvar tokens
       console.log('🔐 PASSO 2: Salvando tokens...');
       localStorage.setItem('access_token', loginData.access_token);
       localStorage.setItem('refresh_token', loginData.refresh_token);
       
-      // PASSO 3: Configurar header de autorização
       console.log('🔐 PASSO 3: Configurando header...');
       api.defaults.headers.common['Authorization'] = `Bearer ${loginData.access_token}`;
       
-      // PASSO 4: Buscar dados do usuário
       console.log('🔐 PASSO 4: Buscando dados do usuário...');
       const userResponse = await api.get<User>('/api/v1/auth/me');
       const userData = userResponse.data;
       console.log('🔐 Dados do usuário recebidos:', userData);
       
-      // PASSO 5: Definir usuário no estado
       console.log('🔐 PASSO 5: Definindo usuário no estado...');
       setUser(userData);
       
-      console.log('🔐 ✅ LOGIN COMPLETO!');
+      console.log('🔐 ✅ LOGIN COMPLETO - USER DEFINIDO!');
       
     } catch (error: any) {
       console.log('🔐 ❌ Erro no login:', error);
-      logout(); // Limpar qualquer estado parcial
+      // NÃO fazer logout aqui se for erro de login
       throw error;
     } finally {
       setIsLoading(false);
@@ -138,12 +132,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     try {
       setIsLoading(true);
       
-      // PASSO 1: Fazer registro
       console.log('🔐 PASSO 1: Fazendo registro...');
       const registerResponse = await api.post('/api/v1/auth/register', data);
       console.log('🔐 Registro bem-sucedido');
       
-      // PASSO 2: Se registro retornar tokens, usar
       if (registerResponse.data.access_token) {
         const authData = registerResponse.data;
         localStorage.setItem('access_token', authData.access_token);
@@ -152,11 +144,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         }
         api.defaults.headers.common['Authorization'] = `Bearer ${authData.access_token}`;
         
-        // Buscar dados completos do usuário
         const userResponse = await api.get<User>('/api/v1/auth/me');
         setUser(userResponse.data);
       } else {
-        // Se registro não retornar tokens, fazer login
         await login({ username: data.username, password: data.password });
       }
       

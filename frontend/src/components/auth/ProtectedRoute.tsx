@@ -1,7 +1,7 @@
 import { ReactNode, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { Box, CircularProgress, Typography, Button, Card, CardContent } from '@mui/material';
+import { Box, CircularProgress, Typography, Button } from '@mui/material';
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -10,20 +10,25 @@ interface ProtectedRouteProps {
 const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const { user, isLoading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
-  console.log('🛡️  ProtectedRoute - user:', user, 'isLoading:', isLoading);
+  console.log('🛡️  ProtectedRoute - user:', user, 'isLoading:', isLoading, 'path:', location.pathname);
 
   useEffect(() => {
     console.log('🛡️  ProtectedRoute useEffect - user:', user, 'isLoading:', isLoading);
     
     if (!isLoading && !user) {
-      console.log('🔄 Redirecionando para /login...');
-      navigate('/login');
+      console.log('🔄 Usuário não autenticado, redirecionando para login...');
+      navigate('/login', { 
+        state: { from: location },
+        replace: true 
+      });
     }
-  }, [user, isLoading, navigate]);
+  }, [user, isLoading, navigate, location]);
 
+  // Aguardar carregamento inicial
   if (isLoading) {
-    console.log('⏳ ProtectedRoute - Mostrando loading...');
+    console.log('⏳ ProtectedRoute - Carregando...');
     return (
       <Box
         sx={{
@@ -38,18 +43,13 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
         <CircularProgress size={60} />
         <Typography variant="h6">Verificando autenticação...</Typography>
         <Typography variant="body2" color="textSecondary">
-          Se esta tela persistir, há um problema no AuthContext
+          Aguarde enquanto validamos seu acesso...
         </Typography>
-        <Button 
-          variant="outlined" 
-          onClick={() => navigate('/login')}
-        >
-          Ir para Login Manualmente
-        </Button>
       </Box>
     );
   }
 
+  // Se não tem usuário após carregamento, está redirecionando
   if (!user) {
     console.log('❌ ProtectedRoute - Sem usuário, redirecionando...');
     return (
@@ -63,19 +63,14 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
           gap: 2
         }}
       >
-        <Card>
-          <CardContent>
-            <Typography variant="h5" gutterBottom>🔄 Redirecionando...</Typography>
-            <Typography>Se não redirecionou automaticamente:</Typography>
-            <Button 
-              variant="contained" 
-              onClick={() => navigate('/login')}
-              sx={{ mt: 2 }}
-            >
-              Clique aqui para Login
-            </Button>
-          </CardContent>
-        </Card>
+        <Typography variant="h5">Redirecionando...</Typography>
+        <Typography>Você precisa estar logado para acessar esta página.</Typography>
+        <Button 
+          variant="contained" 
+          onClick={() => navigate('/login')}
+        >
+          Ir para Login
+        </Button>
       </Box>
     );
   }
