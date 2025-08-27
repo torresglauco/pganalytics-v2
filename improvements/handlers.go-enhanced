@@ -2,9 +2,9 @@ package handlers
 
 import (
 	"net/http"
+	"time"
 	"pganalytics-backend/internal/config"
 	"pganalytics-backend/internal/middleware"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
