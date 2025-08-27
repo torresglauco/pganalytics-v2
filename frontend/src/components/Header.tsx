@@ -1,47 +1,74 @@
-import { AppBar, Toolbar, Typography, Button, Box, Chip } from '@mui/material'
-import { useNavigate, useLocation } from 'react-router-dom'
-import { Dashboard, Settings } from '@mui/icons-material'
+import { useState } from 'react';
+import {
+  AppBar,
+  Toolbar,
+  Typography,
+  Button,
+  Box,
+  IconButton,
+  Menu,
+  MenuItem,
+} from '@mui/material';
+import { Settings, Logout, Person } from '@mui/icons-material';
+import { useAuth } from '../contexts/AuthContext';
 
-const Header: React.FC = () => {
-  const navigate = useNavigate()
-  const location = useLocation()
+interface HeaderProps {
+  onSettingsClick: () => void;
+}
 
-  const menuItems = [
-    { path: '/', label: 'Dashboard', icon: <Dashboard /> },
-    { path: '/settings', label: 'Settings', icon: <Settings /> },
-  ]
+const Header = ({ onSettingsClick }: HeaderProps) => {
+  const { user, logout } = useAuth();
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+
+  const handleMenuClick = (event: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+  };
+
+  const handleLogout = () => {
+    logout();
+    handleMenuClose();
+  };
 
   return (
     <AppBar position="static">
       <Toolbar>
         <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-          pgAnalytics v3.0
+          PG Analytics
         </Typography>
         
-        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-          {menuItems.map((item) => (
-            <Button
-              key={item.path}
-              color="inherit"
-              onClick={() => navigate(item.path)}
-              sx={{
-                backgroundColor: location.pathname === item.path ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
-              }}
-              startIcon={item.icon}
+        {user && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Typography variant="body2">
+              Olá, {user.username}
+            </Typography>
+            
+            <IconButton color="inherit" onClick={onSettingsClick}>
+              <Settings />
+            </IconButton>
+            
+            <IconButton color="inherit" onClick={handleMenuClick}>
+              <Person />
+            </IconButton>
+            
+            <Menu
+              anchorEl={anchorEl}
+              open={Boolean(anchorEl)}
+              onClose={handleMenuClose}
             >
-              {item.label}
-            </Button>
-          ))}
-          
-          <Chip 
-            label="ADMIN" 
-            color="secondary" 
-            size="small"
-          />
-        </Box>
+              <MenuItem onClick={handleLogout}>
+                <Logout sx={{ mr: 1 }} />
+                Sair
+              </MenuItem>
+            </Menu>
+          </Box>
+        )}
       </Toolbar>
     </AppBar>
-  )
-}
+  );
+};
 
-export default Header
+export default Header;
