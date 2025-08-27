@@ -1,100 +1,88 @@
-import { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
+  Card,
+  CardContent,
   TextField,
   Button,
   Typography,
   Alert,
-  Card,
-  CardContent,
+  CircularProgress,
   Container,
-  LinearProgress,
+  Fade
 } from '@mui/material';
 import { useAuth } from '../../contexts/AuthContext';
 
-const LoginForm = () => {
-  const [username, setUsername] = useState('demo');
-  const [password, setPassword] = useState('Demo123!');
+interface LocationState {
+  from?: {
+    pathname: string;
+  };
+}
+
+const LoginForm: React.FC = () => {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [progress, setProgress] = useState('');
-  const { login, isLoading, user } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+  
+  const { login, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  
+  const locationState = location.state as LocationState;
+  const from = locationState?.from?.pathname || '/dashboard';
 
-  console.log('🔐 LoginForm renderizado - user atual:', user);
-
-  // Redirecionar automaticamente se já estiver logado
-  useEffect(() => {
-    console.log('🔐 LoginForm useEffect - user:', user, 'isLoading:', isLoading);
-    
-    if (user && !isLoading) {
-      console.log('🔐 Usuário logado detectado, redirecionando...');
-      const from = (location.state as any)?.from?.pathname || '/dashboard';
+  // Se o usuário já está logado, redireciona imediatamente
+  React.useEffect(() => {
+    if (user) {
       navigate(from, { replace: true });
     }
-  }, [user, isLoading, navigate, location]);
+  }, [user, navigate, from]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (isLoading) return; // Previne múltiplas submissões
+    
     setError('');
     setProgress('');
-    
-    console.log('🔐 Iniciando login para:', username);
+    setIsLoading(true);
 
     try {
-      setProgress('🔐 Fazendo autenticação...');
-      await login({ username, password });
+      setProgress('🔐 Verificando credenciais...');
+      
+      await login(username, password);
       
       setProgress('✅ Login realizado! Redirecionando...');
       
-      // Forçar redirecionamento após pequeno delay
-      setTimeout(() => {
-        const from = (location.state as any)?.from?.pathname || '/dashboard';
-        console.log('🔐 Forçando redirecionamento para:', from);
-        navigate(from, { replace: true });
-      }, 1000);
+      // O redirecionamento será feito pelo useEffect acima quando user for atualizado
       
-    } catch (err: any) {
-      console.error('🔐 Erro no login:', err);
+    } catch (error: any) {
+      console.error('Erro no login:', error);
+      setError(
+        error.response?.data?.detail || 
+        error.message || 
+        'Erro ao fazer login. Verifique suas credenciais.'
+      );
       setProgress('');
-      
-      const errorMessage = err.response?.data?.detail || err.message || 'Erro ao fazer login';
-      if (Array.isArray(errorMessage)) {
-        setError(errorMessage.map((e: any) => e.msg || e).join(', '));
-      } else {
-        setError(errorMessage);
-      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // Se usuário já está logado, mostrar redirecionamento
-  if (user && !isLoading) {
+  // Se o usuário já está logado, não mostra o formulário
+  if (user) {
     return (
       <Container maxWidth="sm">
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
-          <Card sx={{ width: '100%', maxWidth: 400 }}>
-            <CardContent sx={{ p: 4, textAlign: 'center' }}>
-              <Typography variant="h4" gutterBottom color="success.main">
-                ✅ Já está logado!
-              </Typography>
-              <Typography variant="h6" gutterBottom>
-                Olá, {user.full_name}!
-              </Typography>
-              <LinearProgress sx={{ my: 2 }} />
-              <Typography variant="body2" color="textSecondary" gutterBottom>
-                Redirecionando para o dashboard...
-              </Typography>
-              <Button
-                variant="contained"
-                size="large"
-                onClick={() => navigate('/dashboard', { replace: true })}
-                sx={{ mt: 2 }}
-              >
-                Ir Agora para Dashboard
-              </Button>
-            </CardContent>
-          </Card>
+        <Box
+          display="flex"
+          justifyContent="center"
+          alignItems="center"
+          minHeight="100vh"
+        >
+          <CircularProgress />
         </Box>
       </Container>
     );
@@ -103,81 +91,75 @@ const LoginForm = () => {
   return (
     <Container maxWidth="sm">
       <Box
-        sx={{
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'center',
-          minHeight: '100vh',
-        }}
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        minHeight="100vh"
       >
-        <Card sx={{ width: '100%', maxWidth: 400 }}>
-          <CardContent sx={{ p: 4 }}>
-            <Box sx={{ textAlign: 'center', mb: 3 }}>
-              <Typography variant="h3" component="h1" gutterBottom color="primary">
+        <Fade in timeout={800}>
+          <Card elevation={3} sx={{ width: '100%', maxWidth: 400 }}>
+            <CardContent sx={{ p: 4 }}>
+              <Typography variant="h4" component="h1" gutterBottom align="center">
                 PG Analytics
               </Typography>
-              <Typography variant="h6" component="h2" color="textSecondary">
-                Faça login para continuar
+              <Typography variant="h6" component="h2" gutterBottom align="center" color="textSecondary">
+                Faça login em sua conta
               </Typography>
-            </Box>
-            
-            {progress && (
-              <Alert severity="success" sx={{ mb: 2 }}>
-                {progress}
-                {isLoading && <LinearProgress sx={{ mt: 1 }} />}
-              </Alert>
-            )}
-            
-            {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-            
-            <Alert severity="info" sx={{ mb: 3 }}>
-              <strong>Credenciais de teste:</strong><br />
-              Usuário: demo | Senha: Demo123!
-            </Alert>
-            
-            <form onSubmit={handleSubmit}>
-              <TextField
-                fullWidth
-                label="Usuário"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                margin="normal"
-                required
-                autoFocus
-              />
-              <TextField
-                fullWidth
-                type="password"
-                label="Senha"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                margin="normal"
-                required
-              />
-              <Button
-                type="submit"
-                fullWidth
-                variant="contained"
-                size="large"
-                sx={{ mt: 3, mb: 2 }}
-                disabled={isLoading}
-              >
-                {isLoading ? 'Entrando...' : 'Entrar'}
-              </Button>
-            </form>
-            
-            <Box sx={{ textAlign: 'center', mt: 2 }}>
-              <Button
-                variant="text"
-                onClick={() => navigate('/register')}
-                disabled={isLoading}
-              >
-                Criar nova conta
-              </Button>
-            </Box>
-          </CardContent>
-        </Card>
+
+              <Box component="form" onSubmit={handleSubmit} sx={{ mt: 3 }}>
+                <TextField
+                  fullWidth
+                  label="Usuário"
+                  variant="outlined"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                  disabled={isLoading}
+                  sx={{ mb: 2 }}
+                />
+                
+                <TextField
+                  fullWidth
+                  label="Senha"
+                  type="password"
+                  variant="outlined"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={isLoading}
+                  sx={{ mb: 3 }}
+                />
+
+                <Button
+                  type="submit"
+                  fullWidth
+                  variant="contained"
+                  size="large"
+                  disabled={isLoading || !username.trim() || !password.trim()}
+                  sx={{ mb: 2 }}
+                >
+                  {isLoading ? (
+                    <CircularProgress size={24} color="inherit" />
+                  ) : (
+                    'Entrar'
+                  )}
+                </Button>
+
+                {progress && (
+                  <Alert severity="info" sx={{ mb: 2 }}>
+                    {progress}
+                  </Alert>
+                )}
+
+                {error && (
+                  <Alert severity="error">
+                    {error}
+                  </Alert>
+                )}
+              </Box>
+            </CardContent>
+          </Card>
+        </Fade>
       </Box>
     </Container>
   );

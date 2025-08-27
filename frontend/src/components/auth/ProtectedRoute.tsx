@@ -1,81 +1,62 @@
-import { ReactNode, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import React from 'react';
+import { Navigate, useLocation } from 'react-router-dom';
+import { Box, CircularProgress, Container } from '@mui/material';
 import { useAuth } from '../../contexts/AuthContext';
-import { Box, CircularProgress, Typography, Button } from '@mui/material';
 
 interface ProtectedRouteProps {
-  children: ReactNode;
+  children: React.ReactNode;
+  redirectToLogin?: boolean;
 }
 
-const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
+  children, 
+  redirectToLogin = true 
+}) => {
   const { user, isLoading } = useAuth();
-  const navigate = useNavigate();
   const location = useLocation();
 
-  console.log('🛡️  ProtectedRoute - user:', user, 'isLoading:', isLoading, 'path:', location.pathname);
-
-  useEffect(() => {
-    console.log('🛡️  ProtectedRoute useEffect - user:', user, 'isLoading:', isLoading);
-    
-    if (!isLoading && !user) {
-      console.log('🔄 Usuário não autenticado, redirecionando para login...');
-      navigate('/login', { 
-        state: { from: location },
-        replace: true 
-      });
-    }
-  }, [user, isLoading, navigate, location]);
-
-  // Aguardar carregamento inicial
+  // Enquanto está carregando, mostra indicador
   if (isLoading) {
-    console.log('⏳ ProtectedRoute - Carregando...');
     return (
-      <Box
-        sx={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          height: '100vh',
-          gap: 2
-        }}
-      >
-        <CircularProgress size={60} />
-        <Typography variant="h6">Verificando autenticação...</Typography>
-        <Typography variant="body2" color="textSecondary">
-          Aguarde enquanto validamos seu acesso...
-        </Typography>
-      </Box>
-    );
-  }
-
-  // Se não tem usuário após carregamento, está redirecionando
-  if (!user) {
-    console.log('❌ ProtectedRoute - Sem usuário, redirecionando...');
-    return (
-      <Box
-        sx={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          height: '100vh',
-          gap: 2
-        }}
-      >
-        <Typography variant="h5">Redirecionando...</Typography>
-        <Typography>Você precisa estar logado para acessar esta página.</Typography>
-        <Button 
-          variant="contained" 
-          onClick={() => navigate('/login')}
+      <Container maxWidth="sm">
+        <Box
+          display="flex"
+          justifyContent="center"
+          alignItems="center"
+          minHeight="100vh"
+          flexDirection="column"
         >
-          Ir para Login
-        </Button>
-      </Box>
+          <CircularProgress size={48} />
+          <Box mt={2}>
+            Verificando autenticação...
+          </Box>
+        </Box>
+      </Container>
     );
   }
 
-  console.log('✅ ProtectedRoute - Usuário autenticado, mostrando conteúdo...');
+  // Se não está autenticado e deve redirecionar para login
+  if (!user && redirectToLogin) {
+    return (
+      <Navigate
+        to="/login"
+        state={{ from: location }}
+        replace
+      />
+    );
+  }
+
+  // Se não está autenticado e não deve redirecionar para login
+  if (!user && !redirectToLogin) {
+    return (
+      <Navigate
+        to="/login"
+        replace
+      />
+    );
+  }
+
+  // Se está autenticado, renderiza o conteúdo
   return <>{children}</>;
 };
 

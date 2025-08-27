@@ -1,41 +1,37 @@
 import axios from 'axios';
 
-// Versão simples sem import.meta.env nem process
-// Para desenvolvimento local e Docker
-const baseURL = 'http://localhost:8000';
-
-export const api = axios.create({
-  baseURL,
+// Configuração base da API
+const api = axios.create({
+  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8000',
+  timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Interceptor para adicionar token automaticamente
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+// Interceptor para logging de requisições (apenas em desenvolvimento)
+if (process.env.NODE_ENV === 'development') {
+  api.interceptors.request.use(
+    (config) => {
+      console.log(`🚀 ${config.method?.toUpperCase()} ${config.url}`);
+      return config;
+    },
+    (error) => {
+      console.error('❌ Request Error:', error);
+      return Promise.reject(error);
     }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
+  );
 
-// Interceptor para lidar com respostas de erro
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
-      window.location.href = '/login';
+  api.interceptors.response.use(
+    (response) => {
+      console.log(`✅ ${response.config.method?.toUpperCase()} ${response.config.url} - ${response.status}`);
+      return response;
+    },
+    (error) => {
+      console.error(`❌ ${error.config?.method?.toUpperCase()} ${error.config?.url} - ${error.response?.status}`, error.response?.data);
+      return Promise.reject(error);
     }
-    return Promise.reject(error);
-  }
-);
+  );
+}
 
 export default api;
