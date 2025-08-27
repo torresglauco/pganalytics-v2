@@ -99,3 +99,53 @@ MIT License - Feel free to modify and use for your projects!
 ---
 
 **Happy monitoring!** 🐘📊✨
+
+# Atualização necessária para o README.md
+
+## Adicionar seção de Pré-requisitos:
+
+### Pré-requisitos
+
+- **Docker & Docker Compose** (recomendado)
+- **Python 3.11+** (para desenvolvimento local)
+- **Node.js 18+** (para desenvolvimento local do frontend)
+- **npm** (vem com Node.js)
+- **PostgreSQL 12+** (se não usar Docker)
+
+### Instalação Local (sem Docker)
+
+1. **Backend:**
+```bash
+cd backend
+pip install -r requirements.txt
+```
+
+2. **Frontend:**
+```bash
+cd frontend
+npm install
+```
+
+3. **Executar em desenvolvimento:**
+```bash
+# Terminal 1 - Backend
+cd backend
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+
+# Terminal 2 - Frontend
+cd frontend
+npm run dev
+```
+
+### Instalação com Docker (Recomendado)
+
+```bash
+docker-compose up --build
+```
+
+### URLs de Acesso
+
+- **Frontend:** http://localhost:3000 (dev) ou http://localhost (docker)
+- **Backend API:** http://localhost:8000
+- **API Docs:** http://localhost:8000/docs
+
