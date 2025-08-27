@@ -1,0 +1,17 @@
+=================
+NOVAS CREDENCIAIS GERADAS
+=================
+IMPORTANTE: Guarde este arquivo em local seguro e delete-o após uso!
+
+SECRET_KEY: DvshDU_bKUX_nYuBv0GAbCQKgAC19piGM3spzRPPEJs
+POSTGRES_PASSWORD: Wsr7Q48SRHa!IP65053&
+REDIS_PASSWORD: 0Nw88pFRB&j6ndNffL!d
+ADMIN_PASSWORD: XlvXN1V0gdw7D!eu$@ze
+
+=================
+INSTRUÇÕES:
+=================
+1. Use estas credenciais no seu ambiente local
+2. Em produção, gere credenciais diferentes
+3. DELETE este arquivo após configurar
+4. NUNCA commite credenciais no Git
