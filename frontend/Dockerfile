@@ -1,24 +1,35 @@
-FROM node:18-alpine
+# Use uma versão específica do Node.js
+FROM node:18-alpine AS builder
+
+# Instalar dependências necessárias para esbuild
+RUN apk add --no-cache python3 make g++
 
 WORKDIR /app
 
-# Copy package files
+# Copiar arquivos de dependências primeiro (para cache do Docker)
 COPY package.json package-lock.json* ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Limpar cache do npm e instalar dependências
+RUN npm ci --prefer-offline --no-audit
 
-# Copy source code
+# Copiar código fonte
 COPY . .
 
-# Build the application
+# Build da aplicação
 RUN npm run build
 
-# Use nginx to serve the built app
+# Estágio de produção com nginx
 FROM nginx:alpine
-COPY --from=0 /app/dist /usr/share/nginx/html
+
+# Copiar arquivos buildados
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Copiar configuração do nginx
 COPY nginx.conf /etc/nginx/nginx.conf
 
+# Expor porta
 EXPOSE 80
+
+# Comando para iniciar nginx
 CMD ["nginx", "-g", "daemon off;"]
 

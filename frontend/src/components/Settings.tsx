@@ -11,7 +11,7 @@ import {
   Switch,
   FormControlLabel,
 } from '@mui/material'
-import { Save, Database } from '@mui/icons-material'
+import { Save, Storage } from '@mui/icons-material'
 
 const Settings: React.FC = () => {
   const [settings, setSettings] = useState({
@@ -62,7 +62,7 @@ const Settings: React.FC = () => {
           <Card>
             <CardContent>
               <Box display="flex" alignItems="center" gap={1} mb={2}>
-                <Database color="primary" />
+                <Storage color="primary" />
                 <Typography variant="h6">Database Connection</Typography>
               </Box>
               
