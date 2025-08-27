@@ -1,7 +1,41 @@
 -- Criar extensões necessárias
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Tabela para métricas
+-- Deletar enum existente se houver conflito
+DROP TYPE IF EXISTS user_role CASCADE;
+
+-- Criar enum para roles com valores corretos
+CREATE TYPE user_role AS ENUM ('ADMIN', 'DBA', 'VIEWER');
+
+-- Deletar tabela se existir (para recriar com enum correto)
+DROP TABLE IF EXISTS users CASCADE;
+
+-- Criar tabela de usuários
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    full_name VARCHAR(100) NOT NULL,
+    hashed_password VARCHAR(255) NOT NULL,
+    role user_role DEFAULT 'VIEWER',
+    is_active BOOLEAN DEFAULT true,
+    is_verified BOOLEAN DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE,
+    last_login TIMESTAMP WITH TIME ZONE
+);
+
+-- Criar índices
+CREATE INDEX idx_users_username ON users(username);
+CREATE INDEX idx_users_email ON users(email);
+
+-- Inserir usuário admin
+INSERT INTO users (username, email, full_name, hashed_password, role, is_active, is_verified)
+VALUES ('admin', 'admin@pganalytics.com', 'System Administrator', 
+        '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5K8a.gBTZyj.u', -- admin123
+        'ADMIN', true, true);
+
+-- Criar outras tabelas necessárias
 CREATE TABLE IF NOT EXISTS metrics (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -11,7 +45,6 @@ CREATE TABLE IF NOT EXISTS metrics (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Tabela para alertas
 CREATE TABLE IF NOT EXISTS alerts (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     alert_type VARCHAR(50) NOT NULL,
@@ -24,30 +57,15 @@ CREATE TABLE IF NOT EXISTS alerts (
     tags JSONB DEFAULT '{}'
 );
 
--- Tabela para configurações
-CREATE TABLE IF NOT EXISTS settings (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    key VARCHAR(100) UNIQUE NOT NULL,
-    value JSONB NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- Inserir configurações padrão
-INSERT INTO settings (key, value) VALUES 
-('monitoring_interval', '30'),
-('retention_days', '30'),
-('enable_alerts', 'true')
-ON CONFLICT (key) DO NOTHING;
-
 -- Índices para performance
 CREATE INDEX IF NOT EXISTS idx_metrics_timestamp ON metrics(timestamp);
 CREATE INDEX IF NOT EXISTS idx_metrics_name ON metrics(metric_name);
 CREATE INDEX IF NOT EXISTS idx_alerts_timestamp ON alerts(timestamp);
 CREATE INDEX IF NOT EXISTS idx_alerts_acknowledged ON alerts(acknowledged);
 
--- Dados de exemplo
-INSERT INTO metrics (metric_name, metric_value, tags) VALUES 
-('connections_active', 45, '{"database": "postgres"}'),
-('cpu_percent', 25.5, '{"host": "backend"}'),
-('memory_percent', 68.2, '{"host": "backend"}')
-ON CONFLICT DO NOTHING;
+-- Log de sucesso
+DO $$
+BEGIN
+    RAISE NOTICE 'Database initialization completed successfully';
+    RAISE NOTICE 'Admin user created: admin/admin123';
+END $$;
