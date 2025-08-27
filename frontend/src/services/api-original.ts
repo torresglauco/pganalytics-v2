@@ -1,8 +1,14 @@
 import axios from 'axios';
 
-// Versão simples sem import.meta.env nem process
-// Para desenvolvimento local e Docker
-const baseURL = 'http://localhost:8000';
+// Forma mais compatível de acessar variáveis de ambiente
+const getBaseURL = () => {
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    return import.meta.env.VITE_API_URL || 'http://localhost:8000';
+  }
+  return 'http://localhost:8000';
+};
+
+const baseURL = getBaseURL();
 
 export const api = axios.create({
   baseURL,
