@@ -78,3 +78,7 @@ instance/
 # Monitoring
 prometheus_data/
 grafana_data/
+
+# Arquivos de credenciais (nunca commitar)
+CREDENCIAIS_*.txt
+*.credentials
