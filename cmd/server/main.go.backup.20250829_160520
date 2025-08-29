@@ -1,0 +1,84 @@
+package main
+
+import (
+    "database/sql"
+    "log"
+    "os"
+
+    "github.com/gin-gonic/gin"
+    _ "github.com/lib/pq"
+
+    "pganalytics-backend/internal/handlers"
+    "pganalytics-backend/internal/middleware"
+)
+
+func main() {
+    log.Println("🚀 Iniciando PG Analytics API (estruturada)")
+    
+    // Conectar ao PostgreSQL
+    dbHost := getEnv("DB_HOST", "postgres")
+    dbPort := getEnv("DB_PORT", "5432")
+    dbUser := getEnv("DB_USER", "pganalytics")
+    dbPassword := getEnv("DB_PASSWORD", "pganalytics123")
+    dbName := getEnv("DB_NAME", "pganalytics")
+
+    dsn := "host=" + dbHost + " port=" + dbPort + " user=" + dbUser + " password=" + dbPassword + " dbname=" + dbName + " sslmode=disable"
+    
+    var db *sql.DB
+    var err error
+    db, err = sql.Open("postgres", dsn)
+    if err == nil {
+        if err = db.Ping(); err == nil {
+            log.Printf("✅ PostgreSQL conectado: %s", dsn)
+        } else {
+            log.Printf("⚠️ PostgreSQL ping falhou: %v", err)
+            db = nil
+        }
+    } else {
+        log.Printf("⚠️ PostgreSQL conexão falhou: %v", err)
+        db = nil
+    }
+
+    // Inicializar handlers
+    authHandler := handlers.NewAuthHandler(db)
+    healthHandler := handlers.NewHealthHandler(db)
+    metricsHandler := handlers.NewMetricsHandler()
+
+    // Configurar router
+    router := gin.Default()
+
+    // CORS
+    router.Use(func(c *gin.Context) {
+        c.Header("Access-Control-Allow-Origin", "*")
+        c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+        c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        if c.Request.Method == "OPTIONS" {
+            c.AbortWithStatus(204)
+            return
+        }
+        c.Next()
+    })
+
+    // Rotas públicas
+    router.GET("/health", healthHandler.Health)
+    router.POST("/auth/login", authHandler.Login)
+
+    // Rotas protegidas
+    protected := router.Group("/")
+    protected.Use(middleware.AuthMiddleware())
+    protected.GET("/metrics", metricsHandler.GetMetrics)
+
+    port := getEnv("PORT", "8080")
+    log.Printf("🚀 Servidor estruturado rodando na porta %s", port)
+    log.Printf("🌐 Health: http://localhost:%s/health", port)
+    log.Printf("🔐 Login: http://localhost:%s/auth/login", port)
+    
+    router.Run(":" + port)
+}
+
+func getEnv(key, defaultValue string) string {
+    if value := os.Getenv(key); value != "" {
+        return value
+    }
+    return defaultValue
+}

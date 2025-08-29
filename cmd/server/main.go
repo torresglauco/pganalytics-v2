@@ -1,277 +1,131 @@
 package main
 
 import (
-	"log"
-	"net/http"
-	"strings"
-	"time"
-
-	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
-	_ "pganalytics-backend/docs")
-
-// @title PGAnalytics API
-// @version 1.0
-// @description Modern PostgreSQL analytics backend
-// @host localhost:8080
-// @BasePath /
-// @securityDefinitions.apikey BearerAuth
-// @in header
-// @name Authorization
-
-type LoginRequest struct {
-	Username string `json:"username" binding:"required"`
-	Password string `json:"password" binding:"required"`
-}
-
-type LoginResponse struct {
-	Token string `json:"token"`
-	User  string `json:"user"`
-}
-
-type HealthResponse struct {
-	Status    string   `json:"status"`
-	Service   string   `json:"service"`
-	Timestamp string   `json:"timestamp"`
-	Features  []string `json:"features"`
-}
-
-type MetricsRequest struct {
-	Database  string                 `json:"database"`
-	Timestamp string                 `json:"timestamp"`
-	Metrics   map[string]interface{} `json:"metrics"`
-}
-
-type DataResponse struct {
-	QueryPerformance []QueryStat `json:"query_performance"`
-	Connections      Connection  `json:"connections"`
-	Timestamp        string      `json:"timestamp"`
-}
-
-type QueryStat struct {
-	Query   string `json:"query"`
-	AvgTime string `json:"avg_time"`
-	Calls   int    `json:"calls"`
-}
-
-type Connection struct {
-	Active int `json:"active"`
-	Idle   int `json:"idle"`
-	Total  int `json:"total"`
-}
-
-type ErrorResponse struct {
-	Error   string `json:"error"`
-	Details string `json:"details,omitempty"`
-}
-
-var jwtSecret = "your-super-secret-jwt-key"
+    "log"
+    "net/http"
+    "os"
+    "time"
+    
+    "github.com/gin-contrib/cors"
+    "github.com/gin-gonic/gin"
+    "pganalytics-backend/internal/handlers"
+    "pganalytics-backend/internal/middleware"
+)
 
 func main() {
-	gin.SetMode(gin.DebugMode)
-	router := gin.Default()
+    if os.Getenv("GIN_MODE") == "release" {
+        gin.SetMode(gin.ReleaseMode)
+    }
 
-	// CORS
-	router.Use(func(c *gin.Context) {
-		c.Header("Access-Control-Allow-Origin", "*")
-		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Accept, Authorization, Content-Type, X-CSRF-Token")
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(http.StatusNoContent)
-			return
-		}
-		c.Next()
-	})
+    router := gin.Default()
 
-	// Swagger
-	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+    // CORS
+    router.Use(cors.New(cors.Config{
+        AllowOrigins:     []string{"*"},
+        AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+        AllowHeaders:     []string{"*"},
+        ExposeHeaders:    []string{"Content-Length"},
+        AllowCredentials: true,
+        MaxAge:           12 * time.Hour,
+    }))
 
-	// Routes
-	router.GET("/health", healthCheck)
-	router.POST("/auth/login", loginHandler)
+    // Health check (público)
+    router.GET("/health", func(c *gin.Context) {
+        c.JSON(http.StatusOK, gin.H{
+            "status":      "healthy",
+            "message":     "PG Analytics API Docker funcionando",
+            "environment": "docker",
+            "version":     "1.0",
+            "port":        "8080",
+            "database":    "connected",
+        })
+    })
 
-	// Protected routes
-	protected := router.Group("/api")
-	protected.Use(authMiddleware())
-	{
-		protected.POST("/metrics", submitMetrics)
-		protected.GET("/data", getAnalyticsData)
-	}
+    // Auth (público)
+    auth := router.Group("/auth")
+    {
+        auth.POST("/login", handlers.Login)
+    }
 
-	log.Printf("🚀 Server starting on port 8080")
-	log.Printf("📚 Health: http://localhost:8080/health")
-	log.Printf("📚 Swagger: http://localhost:8080/swagger/index.html")
+    // Rotas protegidas diretas
+    protected := router.Group("/")
+    protected.Use(middleware.AuthMiddleware())
+    {
+        protected.GET("/metrics", handlers.GetMetrics)
+    }
 
-	if err := router.Run(":8080"); err != nil {
-		log.Fatal("Failed to start server:", err)
-	}
-}
+    // API v1 (protegidas)
+    api := router.Group("/api/v1")
+    api.Use(middleware.AuthMiddleware())
+    {
+        // Auth profile
+        authGroup := api.Group("/auth")
+        {
+            authGroup.GET("/profile", func(c *gin.Context) {
+                c.JSON(http.StatusOK, gin.H{
+                    "user_id": c.GetInt("user_id"),
+                    "email":   c.GetString("email"),
+                    "role":    c.GetString("role"),
+                    "message": "Profile data",
+                })
+            })
+        }
 
-// @Summary Check API health
-// @Description Get health status
-// @Tags Health
-// @Produce json
-// @Success 200 {object} HealthResponse
-// @Router /health [get]
-func healthCheck(c *gin.Context) {
-	c.JSON(http.StatusOK, HealthResponse{
-		Status:    "ok",
-		Service:   "pganalytics-backend",
-		Timestamp: time.Now().Format(time.RFC3339),
-		Features: []string{
-			"Swagger documentation",
-			"JWT Authentication",
-			"CORS enabled",
-			"Metrics collection",
-			"Analytics API",
-		},
-	})
-}
+        // Analytics routes
+        analytics := api.Group("/analytics")
+        {
+            analytics.GET("/queries/slow", func(c *gin.Context) {
+                c.JSON(http.StatusOK, gin.H{
+                    "queries": []gin.H{
+                        {"query": "SELECT * FROM users", "duration": "2.5s"},
+                        {"query": "SELECT COUNT(*) FROM logs", "duration": "1.8s"},
+                    },
+                    "user": c.GetString("email"),
+                })
+            })
 
-// @Summary User login
-// @Description Authenticate and get JWT token
-// @Tags Authentication
-// @Accept json
-// @Produce json
-// @Param login body LoginRequest true "Credentials"
-// @Success 200 {object} LoginResponse
-// @Failure 400 {object} ErrorResponse
-// @Failure 401 {object} ErrorResponse
-// @Router /auth/login [post]
-func loginHandler(c *gin.Context) {
-	var req LoginRequest
+            analytics.GET("/tables/stats", func(c *gin.Context) {
+                c.JSON(http.StatusOK, gin.H{
+                    "tables": []gin.H{
+                        {"name": "users", "rows": 1500, "size": "12MB"},
+                        {"name": "logs", "rows": 25000, "size": "45MB"},
+                    },
+                    "user": c.GetString("email"),
+                })
+            })
 
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error:   "Invalid request",
-			Details: err.Error(),
-		})
-		return
-	}
+            analytics.GET("/connections", func(c *gin.Context) {
+                c.JSON(http.StatusOK, gin.H{
+                    "active_connections": 15,
+                    "max_connections":    100,
+                    "idle_connections":   5,
+                    "user": c.GetString("email"),
+                })
+            })
 
-	if req.Username == "admin" && req.Password == "admin" {
-		token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-			"username": req.Username,
-			"exp":      time.Now().Add(time.Hour * 24).Unix(),
-			"iat":      time.Now().Unix(),
-		})
+            analytics.GET("/performance", func(c *gin.Context) {
+                c.JSON(http.StatusOK, gin.H{
+                    "cpu_usage":    "25%",
+                    "memory_usage": "60%",
+                    "disk_usage":   "40%",
+                    "user": c.GetString("email"),
+                })
+            })
+        }
+    }
 
-		tokenString, err := token.SignedString([]byte(jwtSecret))
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, ErrorResponse{
-				Error: "Failed to generate token",
-			})
-			return
-		}
+    port := os.Getenv("PORT")
+    if port == "" {
+        port = "8080"
+    }
 
-		c.JSON(http.StatusOK, LoginResponse{
-			Token: tokenString,
-			User:  req.Username,
-		})
-	} else {
-		c.JSON(http.StatusUnauthorized, ErrorResponse{
-			Error: "Invalid credentials",
-		})
-	}
-}
+    log.Printf("🚀 Servidor iniciando na porta %s", port)
+    log.Printf("🔗 Health: http://localhost:%s/health", port)
+    log.Printf("🔐 Login: POST http://localhost:%s/auth/login", port)
+    log.Printf("📊 Metrics: GET http://localhost:%s/metrics", port)
+    log.Printf("🌐 API v1: http://localhost:%s/api/v1/", port)
 
-// @Summary Submit metrics
-// @Description Submit performance metrics
-// @Tags Metrics
-// @Accept json
-// @Produce json
-// @Security BearerAuth
-// @Param metrics body MetricsRequest true "Metrics"
-// @Success 200 {object} map[string]interface{}
-// @Failure 400 {object} ErrorResponse
-// @Failure 401 {object} ErrorResponse
-// @Router /api/metrics [post]
-func submitMetrics(c *gin.Context) {
-	var req MetricsRequest
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error:   "Invalid metrics",
-			Details: err.Error(),
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"status":        "metrics received",
-		"timestamp":     time.Now().Format(time.RFC3339),
-		"database":      req.Database,
-		"metrics_count": len(req.Metrics),
-	})
-}
-
-// @Summary Get analytics data
-// @Description Get performance analytics
-// @Tags Analytics
-// @Produce json
-// @Security BearerAuth
-// @Success 200 {object} DataResponse
-// @Failure 401 {object} ErrorResponse
-// @Router /api/data [get]
-func getAnalyticsData(c *gin.Context) {
-	response := DataResponse{
-		QueryPerformance: []QueryStat{
-			{Query: "SELECT * FROM users WHERE active = true", AvgTime: "2.3ms", Calls: 1500},
-			{Query: "SELECT * FROM orders WHERE date > NOW() - INTERVAL '1 day'", AvgTime: "5.8ms", Calls: 800},
-		},
-		Connections: Connection{
-			Active: 10,
-			Idle:   5,
-			Total:  15,
-		},
-		Timestamp: time.Now().Format(time.RFC3339),
-	}
-
-	c.JSON(http.StatusOK, response)
-}
-
-func authMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		authHeader := c.GetHeader("Authorization")
-
-		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, ErrorResponse{
-				Error: "Authorization header required",
-			})
-			c.Abort()
-			return
-		}
-
-		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
-		if tokenString == authHeader {
-			c.JSON(http.StatusUnauthorized, ErrorResponse{
-				Error: "Bearer token required",
-			})
-			c.Abort()
-			return
-		}
-
-		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, jwt.ErrSignatureInvalid
-			}
-			return []byte(jwtSecret), nil
-		})
-
-		if err != nil || !token.Valid {
-			c.JSON(http.StatusUnauthorized, ErrorResponse{
-				Error: "Invalid token",
-			})
-			c.Abort()
-			return
-		}
-
-		if claims, ok := token.Claims.(jwt.MapClaims); ok {
-			c.Set("username", claims["username"])
-		}
-
-		c.Next()
-	}
+    if err := router.Run(":" + port); err != nil {
+        log.Fatal("Erro ao iniciar servidor:", err)
+    }
 }
