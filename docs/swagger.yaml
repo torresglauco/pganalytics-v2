@@ -1,0 +1,159 @@
+basePath: /
+definitions:
+  models.ErrorResponse:
+    description: Resposta padrão para erros
+    properties:
+      error:
+        description: Mensagem de erro
+        example: Invalid credentials
+        type: string
+    type: object
+  models.LoginRequest:
+    description: Dados necessários para autenticação
+    properties:
+      password:
+        description: Senha do usuário
+        example: admin123
+        type: string
+      username:
+        description: Nome de usuário ou email
+        example: admin
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  models.LoginResponse:
+    description: Resposta da autenticação com token JWT
+    properties:
+      expires_in:
+        description: Tempo de expiração em segundos
+        example: 86400
+        type: integer
+      token:
+        description: Token JWT
+        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        type: string
+      user:
+        description: Email do usuário
+        example: admin@pganalytics.com
+        type: string
+    type: object
+  models.MetricsResponse:
+    description: Métricas de performance e uso do sistema
+    properties:
+      environment:
+        description: Ambiente
+        example: production
+        type: string
+      message:
+        description: Mensagem
+        example: Métricas sistema
+        type: string
+      metrics:
+        description: Dados das métricas
+      source:
+        description: Fonte dos dados
+        example: api
+        type: string
+      success:
+        description: Sucesso da operação
+        example: true
+        type: boolean
+      timestamp:
+        description: Timestamp Unix
+        example: 1672531200
+        type: integer
+      user:
+        description: Dados do usuário
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: suporte@pganalytics.com
+    name: Suporte PG Analytics
+    url: https://pganalytics.com/support
+  description: API REST moderna para análise de PostgreSQL com autenticação JWT
+  license:
+    name: MIT
+    url: https://github.com/torresglauco/pganalytics-v2/blob/main/LICENSE
+  termsOfService: https://pganalytics.com/terms
+  title: PG Analytics API
+  version: "1.0"
+paths:
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Autentica um usuário com username/email e senha, retornando um
+        token JWT
+      parameters:
+      - description: Credenciais de login
+        in: body
+        name: credentials
+        required: true
+        schema:
+          $ref: '#/definitions/models.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Login bem-sucedido
+          schema:
+            $ref: '#/definitions/models.LoginResponse'
+        "400":
+          description: Dados inválidos
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "401":
+          description: Credenciais inválidas
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Erro interno
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Autenticar usuário
+      tags:
+      - Autenticação
+  /metrics:
+    get:
+      consumes:
+      - application/json
+      description: Retorna métricas de performance e uso do sistema (rota protegida)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Métricas obtidas com sucesso
+          schema:
+            $ref: '#/definitions/models.MetricsResponse'
+        "401":
+          description: Token inválido ou ausente
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Erro interno
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Obter métricas do sistema
+      tags:
+      - Métricas
+securityDefinitions:
+  BearerAuth:
+    description: Digite 'Bearer ' seguido do seu token JWT
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
+tags:
+- description: Endpoints para autenticação e gestão de usuários
+  name: Autenticação
+- description: Endpoints para obter métricas e dados de análise
+  name: Métricas
+- description: Endpoints para análise avançada do PostgreSQL
+  name: Analytics
+- description: Endpoints de sistema e health checks
+  name: Sistema

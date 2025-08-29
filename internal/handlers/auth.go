@@ -33,6 +33,18 @@ var testUsers = map[string]models.User{
     },
 }
 
+// Login autentica um usuário e retorna um token JWT
+// @Summary      Autenticar usuário
+// @Description  Autentica um usuário com username/email e senha, retornando um token JWT
+// @Tags         Autenticação
+// @Accept       json
+// @Produce      json
+// @Param        credentials  body      models.LoginRequest   true  "Credenciais de login"
+// @Success      200          {object}  models.LoginResponse  "Login bem-sucedido"
+// @Failure      400          {object}  models.ErrorResponse  "Dados inválidos"
+// @Failure      401          {object}  models.ErrorResponse  "Credenciais inválidas"
+// @Failure      500          {object}  models.ErrorResponse  "Erro interno"
+// @Router       /auth/login [post]
 func Login(c *gin.Context) {
     var req models.LoginRequest
     if err := c.ShouldBindJSON(&req); err != nil {
@@ -43,12 +55,10 @@ func Login(c *gin.Context) {
     var user models.User
     var found bool
     
-    // Busca exata primeiro
     if u, ok := testUsers[req.Username]; ok && u.Password == req.Password {
         user = u
         found = true
     } else {
-        // Busca por email
         for _, u := range testUsers {
             if (u.Email == req.Username || u.Username == req.Username) && u.Password == req.Password {
                 user = u
