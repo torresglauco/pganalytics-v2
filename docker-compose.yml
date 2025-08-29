@@ -1,40 +1,38 @@
 services:
   postgres:
-    image: postgres:15-alpine
+    image: postgres:15
+    container_name: pganalytics-postgres
     environment:
       POSTGRES_DB: pganalytics
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: pganalytics
+      POSTGRES_PASSWORD: pganalytics123
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./docker/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
+      test: ["CMD-SHELL", "pg_isready -U pganalytics -d pganalytics"]
+      interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 5
 
   api:
-    build:
-      context: .
-      dockerfile: Dockerfile.dev
+    build: .
+    container_name: pganalytics-api
     ports:
       - "8080:8080"
     environment:
-      - ENV=development
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_NAME=pganalytics
-      - DB_USER=pganalytics
-      - DB_PASSWORD=pganalytics123
-      - JWT_SECRET=your-super-secret-jwt-key
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: pganalytics
+      DB_PASSWORD: pganalytics123
+      DB_NAME: pganalytics
+      PORT: 8080
+      GIN_MODE: debug
     depends_on:
       postgres:
         condition: service_healthy
-    restart: on-failure
-    command: ["sh", "-c", "sleep 10 && go run ./cmd/server"]
+    restart: unless-stopped
 
 volumes:
   postgres_data:

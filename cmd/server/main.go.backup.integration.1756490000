@@ -1,0 +1,277 @@
+package main
+
+import (
+	"log"
+	"net/http"
+	"strings"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
+	_ "pganalytics-backend/docs")
+
+// @title PGAnalytics API
+// @version 1.0
+// @description Modern PostgreSQL analytics backend
+// @host localhost:8080
+// @BasePath /
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+
+type LoginRequest struct {
+	Username string `json:"username" binding:"required"`
+	Password string `json:"password" binding:"required"`
+}
+
+type LoginResponse struct {
+	Token string `json:"token"`
+	User  string `json:"user"`
+}
+
+type HealthResponse struct {
+	Status    string   `json:"status"`
+	Service   string   `json:"service"`
+	Timestamp string   `json:"timestamp"`
+	Features  []string `json:"features"`
+}
+
+type MetricsRequest struct {
+	Database  string                 `json:"database"`
+	Timestamp string                 `json:"timestamp"`
+	Metrics   map[string]interface{} `json:"metrics"`
+}
+
+type DataResponse struct {
+	QueryPerformance []QueryStat `json:"query_performance"`
+	Connections      Connection  `json:"connections"`
+	Timestamp        string      `json:"timestamp"`
+}
+
+type QueryStat struct {
+	Query   string `json:"query"`
+	AvgTime string `json:"avg_time"`
+	Calls   int    `json:"calls"`
+}
+
+type Connection struct {
+	Active int `json:"active"`
+	Idle   int `json:"idle"`
+	Total  int `json:"total"`
+}
+
+type ErrorResponse struct {
+	Error   string `json:"error"`
+	Details string `json:"details,omitempty"`
+}
+
+var jwtSecret = "your-super-secret-jwt-key"
+
+func main() {
+	gin.SetMode(gin.DebugMode)
+	router := gin.Default()
+
+	// CORS
+	router.Use(func(c *gin.Context) {
+		c.Header("Access-Control-Allow-Origin", "*")
+		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		c.Header("Access-Control-Allow-Headers", "Accept, Authorization, Content-Type, X-CSRF-Token")
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+		c.Next()
+	})
+
+	// Swagger
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
+	// Routes
+	router.GET("/health", healthCheck)
+	router.POST("/auth/login", loginHandler)
+
+	// Protected routes
+	protected := router.Group("/api")
+	protected.Use(authMiddleware())
+	{
+		protected.POST("/metrics", submitMetrics)
+		protected.GET("/data", getAnalyticsData)
+	}
+
+	log.Printf("🚀 Server starting on port 8080")
+	log.Printf("📚 Health: http://localhost:8080/health")
+	log.Printf("📚 Swagger: http://localhost:8080/swagger/index.html")
+
+	if err := router.Run(":8080"); err != nil {
+		log.Fatal("Failed to start server:", err)
+	}
+}
+
+// @Summary Check API health
+// @Description Get health status
+// @Tags Health
+// @Produce json
+// @Success 200 {object} HealthResponse
+// @Router /health [get]
+func healthCheck(c *gin.Context) {
+	c.JSON(http.StatusOK, HealthResponse{
+		Status:    "ok",
+		Service:   "pganalytics-backend",
+		Timestamp: time.Now().Format(time.RFC3339),
+		Features: []string{
+			"Swagger documentation",
+			"JWT Authentication",
+			"CORS enabled",
+			"Metrics collection",
+			"Analytics API",
+		},
+	})
+}
+
+// @Summary User login
+// @Description Authenticate and get JWT token
+// @Tags Authentication
+// @Accept json
+// @Produce json
+// @Param login body LoginRequest true "Credentials"
+// @Success 200 {object} LoginResponse
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Router /auth/login [post]
+func loginHandler(c *gin.Context) {
+	var req LoginRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error:   "Invalid request",
+			Details: err.Error(),
+		})
+		return
+	}
+
+	if req.Username == "admin" && req.Password == "admin" {
+		token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+			"username": req.Username,
+			"exp":      time.Now().Add(time.Hour * 24).Unix(),
+			"iat":      time.Now().Unix(),
+		})
+
+		tokenString, err := token.SignedString([]byte(jwtSecret))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, ErrorResponse{
+				Error: "Failed to generate token",
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, LoginResponse{
+			Token: tokenString,
+			User:  req.Username,
+		})
+	} else {
+		c.JSON(http.StatusUnauthorized, ErrorResponse{
+			Error: "Invalid credentials",
+		})
+	}
+}
+
+// @Summary Submit metrics
+// @Description Submit performance metrics
+// @Tags Metrics
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param metrics body MetricsRequest true "Metrics"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} ErrorResponse
+// @Failure 401 {object} ErrorResponse
+// @Router /api/metrics [post]
+func submitMetrics(c *gin.Context) {
+	var req MetricsRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error:   "Invalid metrics",
+			Details: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":        "metrics received",
+		"timestamp":     time.Now().Format(time.RFC3339),
+		"database":      req.Database,
+		"metrics_count": len(req.Metrics),
+	})
+}
+
+// @Summary Get analytics data
+// @Description Get performance analytics
+// @Tags Analytics
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} DataResponse
+// @Failure 401 {object} ErrorResponse
+// @Router /api/data [get]
+func getAnalyticsData(c *gin.Context) {
+	response := DataResponse{
+		QueryPerformance: []QueryStat{
+			{Query: "SELECT * FROM users WHERE active = true", AvgTime: "2.3ms", Calls: 1500},
+			{Query: "SELECT * FROM orders WHERE date > NOW() - INTERVAL '1 day'", AvgTime: "5.8ms", Calls: 800},
+		},
+		Connections: Connection{
+			Active: 10,
+			Idle:   5,
+			Total:  15,
+		},
+		Timestamp: time.Now().Format(time.RFC3339),
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+func authMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+
+		if authHeader == "" {
+			c.JSON(http.StatusUnauthorized, ErrorResponse{
+				Error: "Authorization header required",
+			})
+			c.Abort()
+			return
+		}
+
+		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+		if tokenString == authHeader {
+			c.JSON(http.StatusUnauthorized, ErrorResponse{
+				Error: "Bearer token required",
+			})
+			c.Abort()
+			return
+		}
+
+		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, jwt.ErrSignatureInvalid
+			}
+			return []byte(jwtSecret), nil
+		})
+
+		if err != nil || !token.Valid {
+			c.JSON(http.StatusUnauthorized, ErrorResponse{
+				Error: "Invalid token",
+			})
+			c.Abort()
+			return
+		}
+
+		if claims, ok := token.Claims.(jwt.MapClaims); ok {
+			c.Set("username", claims["username"])
+		}
+
+		c.Next()
+	}
+}
