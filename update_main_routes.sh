@@ -1,3 +1,12 @@
+#!/bin/bash
+
+echo "🔧 ATUALIZANDO MAIN.GO COM ROTAS CORRETAS"
+
+# Backup
+cp cmd/server/main.go cmd/server/main.go.backup.$(date +%Y%m%d_%H%M%S)
+
+# Criar main.go corrigido
+cat > cmd/server/main.go << 'EOF'
 package main
 
 import (
@@ -13,13 +22,15 @@ import (
 )
 
 func main() {
+    // Configurar Gin para produção se não for desenvolvimento
     if os.Getenv("GIN_MODE") == "release" {
         gin.SetMode(gin.ReleaseMode)
     }
 
+    // Criar router
     router := gin.Default()
 
-    // CORS
+    // Configurar CORS
     router.Use(cors.New(cors.Config{
         AllowOrigins:     []string{"*"},
         AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
@@ -29,7 +40,7 @@ func main() {
         MaxAge:           12 * time.Hour,
     }))
 
-    // Health check (público)
+    // Health check (não protegida)
     router.GET("/health", func(c *gin.Context) {
         c.JSON(http.StatusOK, gin.H{
             "status":      "healthy",
@@ -41,24 +52,24 @@ func main() {
         })
     })
 
-    // Auth (público)
+    // Rotas de autenticação (não protegidas)
     auth := router.Group("/auth")
     {
         auth.POST("/login", handlers.Login)
     }
 
-    // Rotas protegidas diretas
+    // Rotas protegidas
     protected := router.Group("/")
     protected.Use(middleware.AuthMiddleware())
     {
         protected.GET("/metrics", handlers.GetMetrics)
     }
 
-    // API v1 (protegidas)
+    // Rotas API v1 (protegidas) - estrutura do repositório
     api := router.Group("/api/v1")
     api.Use(middleware.AuthMiddleware())
     {
-        // Auth profile
+        // Auth routes
         authGroup := api.Group("/auth")
         {
             authGroup.GET("/profile", func(c *gin.Context) {
@@ -66,12 +77,11 @@ func main() {
                     "user_id": c.GetInt("user_id"),
                     "email":   c.GetString("email"),
                     "role":    c.GetString("role"),
-                    "message": "Profile data",
                 })
             })
         }
 
-        // Analytics routes
+        // Analytics routes (estrutura do repo)
         analytics := api.Group("/analytics")
         {
             analytics.GET("/queries/slow", func(c *gin.Context) {
@@ -80,7 +90,6 @@ func main() {
                         {"query": "SELECT * FROM users", "duration": "2.5s"},
                         {"query": "SELECT COUNT(*) FROM logs", "duration": "1.8s"},
                     },
-                    "user": c.GetString("email"),
                 })
             })
 
@@ -90,7 +99,6 @@ func main() {
                         {"name": "users", "rows": 1500, "size": "12MB"},
                         {"name": "logs", "rows": 25000, "size": "45MB"},
                     },
-                    "user": c.GetString("email"),
                 })
             })
 
@@ -99,7 +107,6 @@ func main() {
                     "active_connections": 15,
                     "max_connections":    100,
                     "idle_connections":   5,
-                    "user": c.GetString("email"),
                 })
             })
 
@@ -108,12 +115,12 @@ func main() {
                     "cpu_usage":    "25%",
                     "memory_usage": "60%",
                     "disk_usage":   "40%",
-                    "user": c.GetString("email"),
                 })
             })
         }
     }
 
+    // Log de inicialização
     port := os.Getenv("PORT")
     if port == "" {
         port = "8080"
@@ -125,7 +132,11 @@ func main() {
     log.Printf("📊 Metrics: GET http://localhost:%s/metrics", port)
     log.Printf("🌐 API v1: http://localhost:%s/api/v1/", port)
 
+    // Iniciar servidor
     if err := router.Run(":" + port); err != nil {
         log.Fatal("Erro ao iniciar servidor:", err)
     }
 }
+EOF
+
+echo "✅ MAIN.GO ATUALIZADO COM ROTAS CORRETAS!"

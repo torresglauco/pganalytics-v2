@@ -6,11 +6,11 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copiar main.go
-COPY main.go ./
+# Copiar código fonte
+COPY . .
 
-# Build limpo
-RUN CGO_ENABLED=0 GOOS=linux go build -o main .
+# Build da aplicação (estruturada)
+RUN CGO_ENABLED=0 GOOS=linux go build -o main ./cmd/server
 
 # Stage final
 FROM alpine:latest
