@@ -1,579 +1,392 @@
-# 🚀 PG Analytics API
+# 🏆 PG Analytics v2 - Sistema Profissional de Monitoramento PostgreSQL
 
-[![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
-[![Go](https://img.shields.io/badge/go-%2300ADD8.svg?style=for-the-badge&logo=go&logoColor=white)](https://golang.org/)
-[![PostgreSQL](https://img.shields.io/badge/postgres-%23316192.svg?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
-[![JWT](https://img.shields.io/badge/JWT-black?style=for-the-badge&logo=JSON%20web%20tokens)](https://jwt.io/)
-[![Swagger](https://img.shields.io/badge/-Swagger-%23Clojure?style=for-the-badge&logo=swagger&logoColor=white)](https://swagger.io/)
+[![Go](https://img.shields.io/badge/Go-1.23.0-blue.svg)](https://golang.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-13+-blue.svg)](https://www.postgresql.org/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
+[![OpenTelemetry](https://img.shields.io/badge/OpenTelemetry-Enabled-orange.svg)](https://opentelemetry.io/)
+[![Prometheus](https://img.shields.io/badge/Prometheus-Metrics-red.svg)](https://prometheus.io/)
+[![Grafana](https://img.shields.io/badge/Grafana-Dashboards-orange.svg)](https://grafana.com/)
 
-**API REST moderna para análise e monitoramento de PostgreSQL com autenticação JWT, métricas em tempo real e documentação interativa.**
+> 🚀 **Sistema enterprise de monitoramento PostgreSQL** com observabilidade completa, métricas em tempo real e arquitetura OpenTelemetry.
 
-## 📋 Índice
+## 📊 **Visão Geral**
 
-- [🎯 Visão Geral](#-visão-geral)
-- [✨ Funcionalidades](#-funcionalidades)
-- [🏗️ Arquitetura](#️-arquitetura)
-- [🚀 Quick Start](#-quick-start)
-- [🔐 Autenticação](#-autenticação)
-- [📊 Endpoints](#-endpoints)
-- [📖 Documentação](#-documentação)
-- [🐳 Docker](#-docker)
-- [⚙️ Configuração](#️-configuração)
-- [🧪 Testes](#-testes)
-- [📈 Monitoramento](#-monitoramento)
-- [🛠️ Desenvolvimento](#️-desenvolvimento)
-- [🔧 Troubleshooting](#-troubleshooting)
-- [📝 Licença](#-licença)
+O **PG Analytics v2** é uma solução completa e moderna para monitoramento de bancos de dados PostgreSQL, oferecendo:
 
-## 🎯 Visão Geral
+- 🔒 **Autenticação JWT segura**
+- 📊 **Métricas em tempo real** (conexões, performance, queries lentas)
+- 🔍 **Observabilidade completa** com OpenTelemetry
+- 📈 **Dashboards interativos** via Grafana
+- 🐳 **Arquitetura containerizada** com Docker
+- 📚 **Documentação Swagger** interativa
+- 🚨 **Sistema de alertas** configurável
 
-O **PG Analytics API** é uma solução completa para monitoramento e análise de bancos de dados PostgreSQL, oferecendo:
+---
 
-- **🔐 Autenticação JWT** robusta e segura
-- **📊 Métricas em tempo real** do PostgreSQL
-- **📖 Documentação Swagger** interativa
-- **🐳 Deploy Docker** simplificado
-- **🏗️ Arquitetura modular** e escalável
-- **⚡ Performance otimizada** para produção
-
-## ✨ Funcionalidades
-
-### 🔒 Segurança
-- [x] Autenticação JWT
-- [x] Middleware de autorização
-- [x] Tokens com expiração configurável
-- [x] Validation de requests
-
-### 📊 Analytics PostgreSQL
-- [x] **Slow Queries** - Consultas lentas com métricas
-- [x] **Table Statistics** - Estatísticas detalhadas de tabelas
-- [x] **Connections Monitor** - Monitoramento de conexões ativas
-- [x] **Performance Metrics** - Métricas de desempenho do banco
-
-### 📖 Documentação
-- [x] **Swagger UI** interativo
-- [x] **OpenAPI 3.0** specification
-- [x] **Examples** e schemas completos
-- [x] **Try it out** direto na interface
-
-### 🛠️ DevOps
-- [x] **Docker Compose** para desenvolvimento
-- [x] **Multi-stage builds** otimizados
-- [x] **Health checks** automáticos
-- [x] **Logging estruturado**
-
-## 🏗️ Arquitetura
+## 🏗️ **Arquitetura do Sistema**
 
 ```
-pganalytics-v2/
-├── cmd/server/           # Entry point da aplicação
-├── internal/
-│   ├── handlers/         # HTTP handlers
-│   ├── middleware/       # Middlewares (auth, CORS, etc)
-│   ├── models/          # Estruturas de dados
-│   └── services/        # Lógica de negócio
-├── migrations/          # Migrações do banco
-├── docs/               # Documentação Swagger gerada
-├── docker-compose.yml  # Configuração Docker
-└── Dockerfile         # Build da aplicação
+┌─────────────────────────────────────────────────────────────────┐
+│                        PG ANALYTICS v2                         │
+│                   Sistema de Monitoramento                     │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────┐    OTLP     ┌──────────────────────────────┐
+│   CLIENT SIDE   │ ────────→   │         SERVER SIDE          │
+│                 │             │                              │
+│ Coletor C       │             │ API Go → Prometheus         │
+│ (OpenTelemetry) │             │ ↓                            │
+│ Port: 8080      │             │ Grafana ← PostgreSQL        │
+└─────────────────┘             └──────────────────────────────┘
 ```
 
-### 🔄 Fluxo de Autenticação
+### **Componentes Principais:**
 
-```mermaid
-sequenceDiagram
-    participant Client
-    participant API
-    participant JWT
-    participant PostgreSQL
+- **🔧 API Go**: Backend REST com autenticação JWT
+- **📊 Coletor C**: Coleta métricas PostgreSQL via OpenTelemetry  
+- **🎯 Prometheus**: Armazenamento e consulta de métricas
+- **📈 Grafana**: Visualização e dashboards
+- **🐘 PostgreSQL**: Base de dados e fonte de métricas
 
-    Client->>API: POST /auth/login
-    API->>PostgreSQL: Validar credenciais
-    PostgreSQL-->>API: Usuário válido
-    API->>JWT: Gerar token
-    JWT-->>API: Token JWT
-    API-->>Client: Token + dados do usuário
-    
-    Client->>API: GET /api/v1/* (com token)
-    API->>JWT: Validar token
-    JWT-->>API: Token válido
-    API->>PostgreSQL: Executar query
-    PostgreSQL-->>API: Dados
-    API-->>Client: Resposta JSON
-```
+---
 
-## 🚀 Quick Start
+## ⚡ **Quick Start**
 
-### Pré-requisitos
-- [Docker](https://www.docker.com/) 20.10+
-- [Docker Compose](https://docs.docker.com/compose/) 2.0+
+### **🐳 Opção 1: Docker (Recomendado)**
 
-### 1. Clone o repositório
 ```bash
-git clone https://github.com/your-repo/pganalytics-v2.git
+# Clone o repositório
+git clone https://github.com/torresglauco/pganalytics-v2.git
 cd pganalytics-v2
+
+# Inicie o sistema completo
+docker-compose -f docker-compose-bypass.yml up -d
+
+# Verifique o status
+docker ps | grep pganalytics
 ```
 
-### 2. Inicie o ambiente
-```bash
-# Iniciar containers
-docker-compose up -d
-
-# Verificar status
-docker-compose ps
-```
-
-### 3. Verifique se está funcionando
-```bash
-# Health check
-curl http://localhost:8080/health
-
-# Resposta esperada:
-# {"status":"healthy","message":"PG Analytics API funcionando",...}
-```
-
-### 4. Acesse a documentação
-🌐 **Swagger UI:** http://localhost:8080/swagger/index.html
-
-## 🔐 Autenticação
-
-### Login
-
-**Endpoint:** `POST /auth/login`
-
-**Request:**
-```json
-{
-  "username": "admin@pganalytics.local",
-  "password": "admin123"
-}
-```
-
-**Response:**
-```json
-{
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "expires_in": 86400,
-  "user": "admin@pganalytics.local"
-}
-```
-
-### Credenciais Disponíveis
-
-| Username | Password | Role |
-|----------|----------|------|
-| `admin@pganalytics.local` | `admin123` | admin |
-| `admin` | `admin123` | admin |
-| `user` | `admin123` | user |
-
-### Usando o Token
-
-Inclua o token JWT no header `Authorization`:
+### **🛠️ Opção 2: Desenvolvimento Local**
 
 ```bash
-curl -H "Authorization: Bearer YOUR_TOKEN" \
-     http://localhost:8080/api/v1/auth/profile
+# Instale dependências
+go mod download
+
+# Configure o ambiente
+cp .env.example .env
+
+# Execute migrações
+make migrate-up
+
+# Inicie a API
+make run
 ```
 
-## 📊 Endpoints
+---
 
-### 🔓 Públicos
+## 🌐 **Endpoints e Acesso**
 
-| Method | Endpoint | Descrição |
-|--------|----------|-----------|
-| `GET` | `/health` | Health check da API |
-| `POST` | `/auth/login` | Autenticação de usuário |
-| `GET` | `/swagger/*` | Documentação Swagger |
+| **Serviço** | **URL** | **Credenciais** | **Descrição** |
+|-------------|---------|-----------------|---------------|
+| 🏠 **API Principal** | [http://localhost:8080](http://localhost:8080) | - | API REST principal |
+| 📚 **Documentação** | [http://localhost:8080/swagger/index.html](http://localhost:8080/swagger/index.html) | - | Swagger UI |
+| 📊 **Métricas** | [http://localhost:8080/metrics](http://localhost:8080/metrics) | - | Métricas Prometheus |
+| 📈 **Grafana** | [http://localhost:3000](http://localhost:3000) | \`admin/admin\` | Dashboards |
+| 🎯 **Prometheus** | [http://localhost:9090](http://localhost:9090) | - | Console métricas |
 
-### 🔒 Protegidos (requer token JWT)
+---
 
-| Method | Endpoint | Descrição |
-|--------|----------|-----------|
-| `GET` | `/api/v1/auth/profile` | Perfil do usuário autenticado |
-| `GET` | `/api/v1/analytics/queries/slow` | Consultas lentas do PostgreSQL |
-| `GET` | `/api/v1/analytics/tables/stats` | Estatísticas das tabelas |
-| `GET` | `/api/v1/analytics/connections` | Conexões ativas no banco |
-| `GET` | `/api/v1/analytics/performance` | Métricas de performance |
-| `GET` | `/metrics` | Métricas da aplicação |
+## 🔐 **Autenticação**
 
-### 📋 Exemplos de Uso
-
-#### 1. Fazer Login
+### **Login:**
 ```bash
-curl -X POST http://localhost:8080/auth/login \
+curl -X POST http://localhost:8080/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin@pganalytics.local","password":"admin123"}'
+  -d '{
+    "email": "admin@example.com",
+    "password": "admin123"
+  }'
 ```
 
-#### 2. Obter Slow Queries
+### **Uso do Token:**
 ```bash
-curl -H "Authorization: Bearer YOUR_TOKEN" \
-     http://localhost:8080/api/v1/analytics/queries/slow
-```
-
-#### 3. Verificar Connections
-```bash
-curl -H "Authorization: Bearer YOUR_TOKEN" \
+curl -H "Authorization: Bearer <seu-jwt-token>" \
      http://localhost:8080/api/v1/analytics/connections
 ```
 
-## 📖 Documentação
+---
 
-### Swagger UI
+## 📊 **Métricas Disponíveis**
 
-A documentação interativa está disponível em:
-🌐 **http://localhost:8080/swagger/index.html**
-
-Funcionalidades do Swagger:
-- ✅ **Try it out** - Teste direto na interface
-- ✅ **Schemas** - Estruturas de dados detalhadas
-- ✅ **Examples** - Exemplos de requests/responses
-- ✅ **Authentication** - Teste com JWT tokens
-
-### Regenerar Documentação
-
-```bash
-# Instalar swag (se necessário)
-go install github.com/swaggo/swag/cmd/swag@latest
-
-# Gerar docs
-swag init -g cmd/server/main.go -o ./docs
+### **🔗 Conexões PostgreSQL:**
+```prometheus
+# Conexões ativas, idle e total
+pganalytics_postgresql_connections{state="active"} 5
+pganalytics_postgresql_connections{state="idle"} 2
+pganalytics_postgresql_connections{state="total"} 7
 ```
 
-## 🐳 Docker
+### **💾 Performance:**
+```prometheus
+# Cache hit ratio
+pganalytics_postgresql_cache_hit_ratio 0.98
 
-### Comandos Úteis
-
-```bash
-# Iniciar ambiente completo
-docker-compose up -d
-
-# Parar containers
-docker-compose down
-
-# Rebuild (após mudanças no código)
-docker-compose build --no-cache
-
-# Ver logs
-docker-compose logs -f api
-
-# Acessar container da API
-docker-compose exec api sh
-
-# Acessar PostgreSQL
-docker-compose exec postgres psql -U postgres -d pganalytics
+# Queries lentas
+pganalytics_postgresql_slow_queries_total 3
 ```
 
-### Estrutura dos Containers
+### **ℹ️ Sistema:**
+```prometheus
+# Informações do coletor
+pganalytics_collector_info{version="1.0",type="c-bypass"} 1
 
-| Container | Porta | Descrição |
-|-----------|-------|-----------|
-| `pganalytics-api` | 8080 | API principal |
-| `pganalytics-postgres` | 5432 | Banco PostgreSQL |
-
-## ⚙️ Configuração
-
-### Variáveis de Ambiente
-
-| Variável | Padrão | Descrição |
-|----------|--------|-----------|
-| `PORT` | `8080` | Porta da API |
-| `GIN_MODE` | `debug` | Modo do Gin (debug/release) |
-| `DB_HOST` | `postgres` | Host do PostgreSQL |
-| `DB_PORT` | `5432` | Porta do PostgreSQL |
-| `DB_USER` | `postgres` | Usuário do banco |
-| `DB_PASSWORD` | `postgres` | Senha do banco |
-| `DB_NAME` | `pganalytics` | Nome do banco |
-| `JWT_SECRET` | `your-secret-key-2024` | Chave secreta JWT |
-
-### Arquivo .env
-
-Crie um arquivo `.env` baseado no `.env.example`:
-
-```bash
-cp .env.example .env
-# Edite conforme necessário
+# Última atualização
+pganalytics_collector_last_update 1756512573
 ```
 
-## 🧪 Testes
+---
 
-### Teste Rápido do Sistema
+## 🗂️ **Estrutura do Projeto**
 
-```bash
-# Executar todos os testes
-bash quick_validation.sh
+```
+pganalytics-v2/
+├── 📁 cmd/server/              # Entry point da aplicação
+├── 📁 docker/                  # Configurações Docker
+├── 📁 docs/                    # Documentação Swagger
+├── 📁 internal/                # Lógica de negócio
+│   ├── handlers/               # Handlers HTTP
+│   ├── middleware/             # Middlewares (auth, CORS)
+│   ├── models/                 # Modelos de dados
+│   └── services/               # Serviços de negócio
+├── 📁 migrations/              # Migrações PostgreSQL
+├── 📁 monitoring/              # Sistema de monitoramento
+│   ├── c-collector/            # Coletor C OpenTelemetry
+│   ├── grafana/                # Configurações Grafana
+│   ├── prometheus/             # Configurações Prometheus
+│   └── alertmanager/           # Sistema de alertas
+├── 📁 tests/                   # Scripts de teste
+├── 🐳 docker-compose-*.yml     # Diferentes setups Docker
+├── 📄 go.mod                   # Dependências Go
+├── 📄 Makefile                 # Comandos de build
+└── 📄 README.md                # Documentação principal
 ```
 
-### Testes Manuais
+---
 
+## 🔧 **Comandos Úteis**
+
+### **🐳 Docker:**
 ```bash
-# 1. Health Check
+# Iniciar todos os serviços
+docker-compose -f docker-compose-bypass.yml up -d
+
+# Ver logs específicos
+docker logs pganalytics-c-bypass-collector
+
+# Parar serviços
+docker-compose -f docker-compose-bypass.yml down
+
+# Rebuild
+docker-compose -f docker-compose-bypass.yml up --build
+```
+
+### **🛠️ Desenvolvimento:**
+```bash
+# Build da aplicação
+make build
+
+# Executar testes
+make test
+
+# Executar migrações
+make migrate-up
+
+# Reverter migrações
+make migrate-down
+
+# Live reload (desenvolvimento)
+make dev
+```
+
+### **📊 Monitoramento:**
+```bash
+# Verificar métricas
+curl http://localhost:8080/metrics
+
+# Status dos containers
+docker ps | grep pganalytics
+
+# Health check da API
 curl http://localhost:8080/health
-
-# 2. Login
-TOKEN=$(curl -s -X POST http://localhost:8080/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin@pganalytics.local","password":"admin123"}' \
-  | jq -r '.token')
-
-# 3. Endpoint protegido
-curl -H "Authorization: Bearer $TOKEN" \
-     http://localhost:8080/api/v1/auth/profile
-
-# 4. Analytics
-curl -H "Authorization: Bearer $TOKEN" \
-     http://localhost:8080/api/v1/analytics/queries/slow
 ```
 
-### Validação de Endpoints
+---
 
-| Endpoint | Status Esperado | Descrição |
-|----------|----------------|-----------|
-| `/health` | 200 | Deve retornar `"healthy"` |
-| `/auth/login` | 200 | Deve retornar token JWT |
-| `/api/v1/auth/profile` | 200 | Dados do usuário (com token) |
-| `/api/v1/analytics/*` | 200 | Dados de analytics (com token) |
-| `/swagger/index.html` | 200 | Interface Swagger |
+## 🛠️ **Tecnologias Utilizadas**
 
-## 📈 Monitoramento
+### **Backend:**
+- **Go 1.23.0** - Linguagem principal
+- **Gin Framework** - Framework web
+- **PostgreSQL** - Banco de dados
+- **JWT** - Autenticação segura
+- **SQLX** - ORM Go
 
-### Health Checks
+### **Monitoramento:**
+- **OpenTelemetry** - Observabilidade
+- **Prometheus** - Métricas
+- **Grafana** - Visualização
+- **AlertManager** - Alertas
 
+### **DevOps:**
+- **Docker & Docker Compose** - Containerização
+- **GitHub Actions** - CI/CD
+- **Multi-stage Builds** - Otimização
+
+### **Documentação:**
+- **Swagger/OpenAPI 3.0** - Documentação API
+- **Swaggo** - Geração automática
+
+---
+
+## 📈 **Dashboards Grafana**
+
+### **📊 Dashboard Principal:**
+- Conexões PostgreSQL em tempo real
+- Performance de queries
+- Cache hit ratio
+- Uso de recursos
+
+### **🚨 Alertas Configurados:**
+- Conexões acima de 80%
+- Cache hit ratio abaixo de 95%
+- Queries lentas acima de 1s
+- Sistema indisponível
+
+---
+
+## 🧪 **Testes**
+
+### **Executar testes completos:**
 ```bash
-# API Health
-curl http://localhost:8080/health
+# Testes unitários
+make test
 
-# Database Health
-docker-compose exec postgres pg_isready -U postgres
+# Testes de integração
+make test-integration
+
+# Testes de API
+./tests/api_test.sh
+
+# Verificação de sistema
+./final-elegant-status.sh
 ```
 
-### Logs
+---
 
+## 🚀 **Deploy em Produção**
+
+### **📋 Checklist de Deploy:**
+
+✅ **Configuração:**
+- [ ] Configurar \`.env\` com dados reais
+- [ ] SSL/TLS configurado
+- [ ] Firewall configurado
+- [ ] Backup strategy definida
+
+✅ **Segurança:**
+- [ ] Senhas fortes definidas
+- [ ] JWT secret seguro
+- [ ] RBAC configurado
+- [ ] Logs de auditoria ativos
+
+✅ **Monitoramento:**
+- [ ] Alertas configurados
+- [ ] Dashboards personalizados
+- [ ] Retention policy definida
+- [ ] Backup de configurações
+
+### **🔧 Deploy Docker:**
 ```bash
-# Logs da API
-docker-compose logs -f api
+# Produção
+docker-compose -f docker-compose-bypass.yml up -d
 
-# Logs do PostgreSQL
-docker-compose logs -f postgres
-
-# Logs combinados
-docker-compose logs -f
+# Com recursos limitados
+docker-compose -f docker-compose-bypass.yml up -d \
+  --scale c-bypass-collector=2
 ```
 
-### Métricas
+---
 
-Acesse as métricas em: `GET /metrics` (requer autenticação)
+## 🔮 **Roadmap**
 
-## 🛠️ Desenvolvimento
+### **🎯 Próximas Funcionalidades:**
+- [ ] **Multi-tenant support**
+- [ ] **API GraphQL**
+- [ ] **Backup automático**
+- [ ] **Distributed tracing**
+- [ ] **Mobile app**
+- [ ] **AI-powered insights**
 
-### Setup Local
+### **🔧 Melhorias Técnicas:**
+- [ ] **Kubernetes support**
+- [ ] **Redis caching**
+- [ ] **Rate limiting**
+- [ ] **API versioning**
+- [ ] **Health checks avançados**
 
-```bash
-# 1. Clone o repositório
-git clone https://github.com/your-repo/pganalytics-v2.git
-cd pganalytics-v2
+---
 
-# 2. Instalar dependências Go
-go mod download
-
-# 3. Iniciar PostgreSQL
-docker-compose up -d postgres
-
-# 4. Executar localmente
-go run cmd/server/main.go
-```
-
-### Estrutura do Código
-
-```go
-// Handler exemplo
-func GetSlowQueries(c *gin.Context) {
-    // Lógica do endpoint
-    c.JSON(http.StatusOK, response)
-}
-
-// Middleware de autenticação
-func AuthMiddleware() gin.HandlerFunc {
-    return func(c *gin.Context) {
-        // Validação JWT
-    }
-}
-```
-
-### Adicionando Novos Endpoints
-
-1. **Criar handler** em `internal/handlers/`
-2. **Adicionar rota** em `cmd/server/main.go`
-3. **Documentar** com comentários Swagger
-4. **Regenerar docs:** `swag init`
-
-## 🔧 Troubleshooting
-
-### Problemas Comuns
-
-#### 1. Erro de Build Docker
-```bash
-# Limpar cache e rebuild
-docker-compose down
-docker-compose build --no-cache
-docker-compose up -d
-```
-
-#### 2. Login Retorna "Invalid request format"
-**Solução:** Use `"username"` no JSON, não `"email"`:
-```json
-{
-  "username": "admin@pganalytics.local",
-  "password": "admin123"
-}
-```
-
-#### 3. Endpoints Retornam 401
-**Solução:** Verifique se o token JWT está no header:
-```bash
-curl -H "Authorization: Bearer YOUR_TOKEN" http://localhost:8080/api/v1/...
-```
-
-#### 4. PostgreSQL Connection Error
-```bash
-# Verificar se o PostgreSQL está rodando
-docker-compose ps
-docker-compose logs postgres
-
-# Restart do banco
-docker-compose restart postgres
-```
-
-#### 5. Swagger Não Carrega
-```bash
-# Regenerar documentação
-swag init -g cmd/server/main.go -o ./docs
-docker-compose restart api
-```
-
-### Debug Mode
-
-Para debug detalhado, configure:
-```bash
-export GIN_MODE=debug
-```
-
-### Logs Detalhados
-
-```bash
-# Ver logs em tempo real
-docker-compose logs -f api
-
-# Filtrar erros
-docker-compose logs api | grep -i error
-```
-
-## 🚀 Deploy em Produção
-
-### Checklist de Produção
-
-- [ ] **Configurar secrets** adequados (JWT_SECRET, DB_PASSWORD)
-- [ ] **Usar GIN_MODE=release**
-- [ ] **Configurar HTTPS**
-- [ ] **Setup de backup** do PostgreSQL
-- [ ] **Monitoramento** (Prometheus/Grafana)
-- [ ] **Load balancer** (Nginx/HAProxy)
-- [ ] **Logs centralizados** (ELK Stack)
-
-### Exemplo Docker Compose Produção
-
-```yaml
-version: '3.8'
-services:
-  api:
-    build: .
-    environment:
-      - GIN_MODE=release
-      - JWT_SECRET=${JWT_SECRET}
-    restart: unless-stopped
-    
-  postgres:
-    image: postgres:15
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    restart: unless-stopped
-
-volumes:
-  postgres_data:
-```
-
-## 🤝 Contribuindo
+## 🤝 **Contribuição**
 
 1. **Fork** o projeto
-2. **Crie** uma branch: `git checkout -b feature/nova-funcionalidade`
-3. **Commit** as mudanças: `git commit -m 'Add nova funcionalidade'`
-4. **Push** para a branch: `git push origin feature/nova-funcionalidade`
+2. **Crie** uma branch para sua feature (\`git checkout -b feature/AmazingFeature\`)
+3. **Commit** suas mudanças (\`git commit -m 'Add some AmazingFeature'\`)
+4. **Push** para a branch (\`git push origin feature/AmazingFeature\`)
 5. **Abra** um Pull Request
 
-## 📋 Roadmap
+---
 
-### 🎯 Próximas Funcionalidades
+## 📞 **Suporte**
 
-- [ ] **Dashboard Web** (React/Vue)
-- [ ] **Alertas em tempo real**
-- [ ] **Histórico de métricas**
-- [ ] **Multi-tenant support**
-- [ ] **API rate limiting**
-- [ ] **Backup automático**
-- [ ] **Grafana integration**
-- [ ] **Mobile app**
+### **🐛 Issues:**
+- [GitHub Issues](https://github.com/torresglauco/pganalytics-v2/issues)
 
-### 🔧 Melhorias Técnicas
+### **📚 Documentação:**
+- [Swagger API](http://localhost:8080/swagger/index.html)
+- [Grafana Dashboards](http://localhost:3000)
 
-- [ ] **Unit tests** completos
-- [ ] **Integration tests**
-- [ ] **Performance benchmarks**
-- [ ] **Security audit**
-- [ ] **API versioning**
-- [ ] **Caching layer** (Redis)
+### **🔧 Debug:**
+```bash
+# Verificar logs
+docker logs pganalytics-c-bypass-collector
 
-## 📊 Status do Projeto
+# Status detalhado
+./final-elegant-status.sh
 
-| Componente | Status | Versão |
-|------------|--------|--------|
-| **API Core** | ✅ Produção | v1.0 |
-| **Autenticação JWT** | ✅ Produção | v1.0 |
-| **PostgreSQL Analytics** | ✅ Produção | v1.0 |
-| **Swagger Docs** | ✅ Produção | v1.0 |
-| **Docker Deploy** | ✅ Produção | v1.0 |
-| **Dashboard Web** | 🚧 Desenvolvimento | - |
-| **Mobile App** | 📋 Planejado | - |
-
-## 📞 Suporte
-
-- **📧 Email:** support@pganalytics.com
-- **🐛 Issues:** [GitHub Issues](https://github.com/your-repo/pganalytics-v2/issues)
-- **📖 Wiki:** [GitHub Wiki](https://github.com/your-repo/pganalytics-v2/wiki)
-- **💬 Discussions:** [GitHub Discussions](https://github.com/your-repo/pganalytics-v2/discussions)
-
-## 📝 Licença
-
-Este projeto está licenciado sob a **MIT License** - veja o arquivo [LICENSE](LICENSE) para detalhes.
+# Métricas demo
+./metrics-demo.sh
+```
 
 ---
 
-## 🎉 Agradecimentos
+## 📄 **Licença**
 
-Obrigado a todos que contribuíram para tornar este projeto uma realidade:
-
-- **Equipe de Desenvolvimento** 👨‍💻
-- **Beta Testers** 🧪
-- **Community Contributors** 🤝
-- **Open Source Libraries** 📚
+Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICENSE) para detalhes.
 
 ---
 
-<div align="center">
+## 🏆 **Créditos**
 
-**🚀 PG Analytics API - Monitoramento PostgreSQL de Próximo Nível**
+Desenvolvido com ❤️ por **Glauco Torres** usando as melhores práticas de desenvolvimento Go e arquitetura de microserviços.
 
-[![Made with ❤️](https://img.shields.io/badge/Made%20with-❤️-red.svg)](https://github.com/your-repo/pganalytics-v2)
+### **🌟 Tecnologias de Destaque:**
+- **Go** para performance e simplicidade
+- **OpenTelemetry** para observabilidade moderna
+- **Prometheus + Grafana** para monitoramento enterprise
+- **Docker** para portabilidade e escalabilidade
 
-[⬆ Voltar ao topo](#-pg-analytics-api)
+---
 
-</div>
+**🚀 Pronto para produção! Sistema de monitoramento PostgreSQL de nível enterprise.** 
+
+Para começar: \`docker-compose -f docker-compose-bypass.yml up -d\` 🎯
