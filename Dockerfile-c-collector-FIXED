@@ -1,0 +1,21 @@
+FROM alpine:3.18
+
+# Instalar dependências corretas para PostgreSQL
+RUN apk add --no-cache \
+    gcc \
+    musl-dev \
+    postgresql-dev \
+    postgresql-client \
+    libpq \
+    libmicrohttpd-dev \
+    make \
+    pkgconfig \
+    curl-dev \
+    json-c-dev
+
+WORKDIR /app
+COPY . .
+RUN make clean && make
+
+EXPOSE 9188
+CMD ["./pg_metrics_collector"]
