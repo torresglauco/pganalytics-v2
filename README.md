@@ -1,3 +1,5 @@
+[![License](https://img.shields.io/badge/License-Non--Commercial-red.svg)](LICENSE)
+[![Copyright](https://img.shields.io/badge/Copyright-2025-blue.svg)](COPYRIGHT.md)
 # 🚀 PG Analytics v2 - Sistema Enterprise de Monitoramento PostgreSQL
 
 [![Status](https://img.shields.io/badge/Status-Production%20Ready-green.svg)](https://github.com/pganalytics/v2)
@@ -264,3 +266,17 @@ bash test_system_definitive.sh
 *Última atualização: $(date)*
 *Status: Production Ready*
 *Testes: 12/13 aprovados*
+
+## 📜 Licença
+
+Este projeto está licenciado sob uma **Licença Não-Comercial**.
+
+### 🎯 Resumo da Licença:
+- ✅ **Uso gratuito** para fins pessoais, educacionais e internos
+- ❌ **Proibido uso comercial** - não pode vender ou usar para gerar receita
+- ❌ **Proibido oferecer como serviço** pago
+- 🔖 **Atribuição obrigatória** - manter créditos originais
+
+📄 Para detalhes completos, consulte o arquivo [LICENSE](LICENSE).
+
+📧 **Licença Comercial**: Para uso comercial, entre em contato: [seu-email@exemplo.com]
