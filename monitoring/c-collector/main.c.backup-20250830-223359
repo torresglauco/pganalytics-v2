@@ -1,0 +1,508 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <time.h>
+#include <libpq-fe.h>
+
+#define PORT 8080
+#define BUFFER_SIZE 4096
+
+// Global variables
+PGconn *conn = NULL;
+time_t last_update = 0;
+int total_connections = 0;
+int active_connections = 0;
+int idle_connections = 0;
+double cache_hit_ratio = 0.0;
+
+// Database connection with retry logic
+int connect_database() {
+    const char *conninfo = "host=postgres port=5432 dbname=pganalytics user=admin password=admin123 connect_timeout=10";
+    
+    if (conn) {
+        PQfinish(conn);
+        conn = NULL;
+    }
+    
+    printf("Connecting to PostgreSQL...\n");
+    conn = PQconnectdb(conninfo);
+    
+    if (PQstatus(conn) != CONNECTION_OK) {
+        printf("Connection failed: %s", PQerrorMessage(conn));
+        PQfinish(conn);
+        conn = NULL;
+        return 0;
+    }
+    
+    printf("Connected to PostgreSQL successfully!\n");
+    return 1;
+}
+
+// Collect real metrics from PostgreSQL
+void collect_real_metrics() {
+    if (!conn || PQstatus(conn) != CONNECTION_OK) {
+        if (!connect_database()) {
+            return;
+        }
+    }
+    
+    // Test connection with simple query
+    PGresult *test = PQexec(conn, "SELECT 1");
+    if (PQresultStatus(test) != PGRES_TUPLES_OK) {
+        printf("Connection lost, trying to reconnect...\n");
+        PQclear(test);
+        if (!connect_database()) {
+            return;
+        }
+    } else {
+        PQclear(test);
+    }
+    
+    // Get connection statistics
+    PGresult *res = PQexec(conn, 
+        "SELECT "
+        "  COUNT(*) as total, "
+        "  COUNT(CASE WHEN state = 'active' THEN 1 END) as active, "
+        "  COUNT(CASE WHEN state = 'idle' THEN 1 END) as idle "
+        "FROM pg_stat_activity WHERE pid <> pg_backend_pid()"
+    );
+    
+    if (PQresultStatus(res) == PGRES_TUPLES_OK && PQntuples(res) > 0) {
+        total_connections = atoi(PQgetvalue(res, 0, 0));
+        active_connections = atoi(PQgetvalue(res, 0, 1));
+        idle_connections = atoi(PQgetvalue(res, 0, 2));
+        printf("Connections: %d total, %d active, %d idle\n", 
+               total_connections, active_connections, idle_connections);
+    } else {
+        printf("Error querying connections: %s\n", PQerrorMessage(conn));
+    }
+    PQclear(res);
+    
+    // Get cache hit ratio
+    res = PQexec(conn,
+        "SELECT "
+        "  ROUND("
+        "    CASE WHEN (blks_hit + blks_read) > 0 "
+        "    THEN blks_hit::numeric / (blks_hit + blks_read) "
+        "    ELSE 0 END, 4"
+        "  ) as cache_hit_ratio "
+        "FROM pg_stat_database WHERE datname = current_database()"
+    );
+    
+    if (PQresultStatus(res) == PGRES_TUPLES_OK && PQntuples(res) > 0) {
+        cache_hit_ratio = atof(PQgetvalue(res, 0, 0));
+        printf("Cache hit ratio: %.2f%%\n", cache_hit_ratio * 100);
+    }
+    PQclear(res);
+    
+    last_update = time(NULL);
+    printf("Metrics collected successfully!\n");
+}
+
+// Generate Prometheus metrics
+void send_metrics(int client_socket) {
+    char response[BUFFER_SIZE];
+    char body[BUFFER_SIZE];
+    
+    snprintf(body, sizeof(body),
+        "# HELP pganalytics_collector_info Information about the collector\n"
+        "# TYPE pganalytics_collector_info gauge\n"
+        "pganalytics_collector_info{version=\"1.0\",type=\"c-bypass\"} 1\n"
+        "\n"
+        "# HELP pganalytics_collector_last_update Last metrics update timestamp\n"
+        "# TYPE pganalytics_collector_last_update gauge\n"
+        "pganalytics_collector_last_update %ld\n"
+        "\n"
+        "# HELP pganalytics_postgresql_connections Number of PostgreSQL connections\n"
+        "# TYPE pganalytics_postgresql_connections gauge\n"
+        "pganalytics_postgresql_connections{state=\"total\"} %d\n"
+        "pganalytics_postgresql_connections{state=\"active\"} %d\n"
+        "pganalytics_postgresql_connections{state=\"idle\"} %d\n"
+        "\n"
+        "# HELP pganalytics_postgresql_cache_hit_ratio PostgreSQL cache hit ratio\n"
+        "# TYPE pganalytics_postgresql_cache_hit_ratio gauge\n"
+        "pganalytics_postgresql_cache_hit_ratio %.4f\n"
+        "\n"
+        "# HELP pganalytics_postgresql_database_connected Database connection status\n"
+        "# TYPE pganalytics_postgresql_database_connected gauge\n"
+        "pganalytics_postgresql_database_connected %d\n",
+        last_update,
+        total_connections,
+        active_connections, 
+        idle_connections,
+        cache_hit_ratio,
+        (conn && PQstatus(conn) == CONNECTION_OK) ? 1 : 0
+    );
+    
+    snprintf(response, sizeof(response),
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Type: text/plain; version=0.0.4\r\n"
+        "Content-Length: %ld\r\n"
+        "Connection: close\r\n\r\n%s",
+        strlen(body), body);
+    
+    send(client_socket, response, strlen(response), 0);
+}
+
+// Generate health check response
+void send_health(int client_socket) {
+    char response[BUFFER_SIZE];
+    char body[512];
+    
+    time_t now = time(NULL);
+    int db_connected = (conn && PQstatus(conn) == CONNECTION_OK) ? 1 : 0;
+    int data_age = (int)(now - last_update);
+    
+    const char* status = db_connected ? "healthy" : "unhealthy";
+    
+    snprintf(body, sizeof(body),
+        "{\n"
+        "  \"status\": \"%s\",\n"
+        "  \"timestamp\": %ld,\n"
+        "  \"database_connected\": %s,\n"
+        "  \"last_update\": %ld,\n"
+        "  \"data_age_seconds\": %d,\n"
+        "  \"version\": \"1.0\",\n"
+        "  \"type\": \"c-bypass\",\n"
+        "  \"metrics\": {\n"
+        "    \"total_connections\": %d,\n"
+        "    \"active_connections\": %d,\n"
+        "    \"cache_hit_ratio\": %.4f\n"
+        "  }\n"
+        "}",
+        status, now, db_connected ? "true" : "false", 
+        last_update, data_age,
+        total_connections, active_connections, cache_hit_ratio
+    );
+    
+    snprintf(response, sizeof(response),
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Type: application/json\r\n"
+        "Content-Length: %ld\r\n"
+        "Connection: close\r\n\r\n%s",
+        strlen(body), body);
+    
+    send(client_socket, response, strlen(response), 0);
+}
+
+// Send OpenAPI specification
+void send_openapi_spec(int client_socket) {
+    const char* openapi_json = "{"
+        "\"openapi\": \"3.0.3\","
+        "\"info\": {"
+        "  \"title\": \"PG Analytics C Collector API\","
+        "  \"description\": \"PostgreSQL Analytics C Collector REST API\","
+        "  \"version\": \"1.0.0\""
+        "},"
+        "\"servers\": [{"
+        "  \"url\": \"http://localhost:8080\","
+        "  \"description\": \"Local development server\""
+        "}],"
+        "\"paths\": {"
+        "  \"/\": {"
+        "    \"get\": {"
+        "      \"summary\": \"API Information\","
+        "      \"responses\": {"
+        "        \"200\": {"
+        "          \"description\": \"API information\","
+        "          \"content\": {\"text/plain\": {\"schema\": {\"type\": \"string\"}}}"
+        "        }"
+        "      }"
+        "    }"
+        "  },"
+        "  \"/health\": {"
+        "    \"get\": {"
+        "      \"summary\": \"Health Check\","
+        "      \"description\": \"Returns the health status of the collector and database connection\","
+        "      \"responses\": {"
+        "        \"200\": {"
+        "          \"description\": \"Health check successful\","
+        "          \"content\": {\"application/json\": {\"schema\": {\"type\": \"object\"}}}"
+        "        }"
+        "      }"
+        "    }"
+        "  },"
+        "  \"/metrics\": {"
+        "    \"get\": {"
+        "      \"summary\": \"Prometheus Metrics\","
+        "      \"description\": \"Returns PostgreSQL metrics in Prometheus format\","
+        "      \"responses\": {"
+        "        \"200\": {"
+        "          \"description\": \"Metrics in Prometheus format\","
+        "          \"content\": {\"text/plain\": {\"schema\": {\"type\": \"string\"}}}"
+        "        }"
+        "      }"
+        "    }"
+        "  },"
+        "  \"/docs\": {"
+        "    \"get\": {"
+        "      \"summary\": \"API Documentation\","
+        "      \"responses\": {"
+        "        \"200\": {\"description\": \"HTML documentation\"}"
+        "      }"
+        "    }"
+        "  },"
+        "  \"/swagger\": {"
+        "    \"get\": {"
+        "      \"summary\": \"Swagger UI\","
+        "      \"responses\": {"
+        "        \"200\": {\"description\": \"Swagger UI interface\"}"
+        "      }"
+        "    }"
+        "  }"
+        "}"
+        "}";
+    
+    char response[BUFFER_SIZE * 2];
+    snprintf(response, sizeof(response),
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Type: application/json\r\n"
+        "Content-Length: %ld\r\n"
+        "Access-Control-Allow-Origin: *\r\n"
+        "Connection: close\r\n\r\n%s",
+        strlen(openapi_json), openapi_json);
+    
+    send(client_socket, response, strlen(response), 0);
+}
+
+// Send Swagger UI
+void send_swagger_ui(int client_socket) {
+    const char* swagger_html = "<!DOCTYPE html>"
+        "<html>"
+        "<head>"
+        "  <title>PG Analytics C Collector - Swagger UI</title>"
+        "  <link rel=\"stylesheet\" type=\"text/css\" href=\"https://unpkg.com/swagger-ui-dist@3.52.5/swagger-ui.css\" />"
+        "  <style>html{box-sizing: border-box;overflow: -moz-scrollbars-vertical;overflow-y: scroll;}*,*:before,*:after{box-sizing: inherit;}body{margin:0;background: #fafafa;}</style>"
+        "</head>"
+        "<body>"
+        "  <div id=\"swagger-ui\"></div>"
+        "  <script src=\"https://unpkg.com/swagger-ui-dist@3.52.5/swagger-ui-bundle.js\"></script>"
+        "  <script src=\"https://unpkg.com/swagger-ui-dist@3.52.5/swagger-ui-standalone-preset.js\"></script>"
+        "  <script>"
+        "    window.onload = function() {"
+        "      const ui = SwaggerUIBundle({"
+        "        url: '/openapi.json',"
+        "        dom_id: '#swagger-ui',"
+        "        deepLinking: true,"
+        "        presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],"
+        "        plugins: [SwaggerUIBundle.plugins.DownloadUrl],"
+        "        layout: \"StandaloneLayout\""
+        "      });"
+        "    };"
+        "  </script>"
+        "</body>"
+        "</html>";
+    
+    char response[BUFFER_SIZE * 2];
+    snprintf(response, sizeof(response),
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Type: text/html\r\n"
+        "Content-Length: %ld\r\n"
+        "Connection: close\r\n\r\n%s",
+        strlen(swagger_html), swagger_html);
+    
+    send(client_socket, response, strlen(response), 0);
+}
+
+// Send API documentation
+void send_docs(int client_socket) {
+    const char* docs_html = "<!DOCTYPE html>"
+        "<html>"
+        "<head>"
+        "  <title>PG Analytics C Collector - API Documentation</title>"
+        "  <style>"
+        "    body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }"
+        "    .endpoint { background: #f5f5f5; padding: 15px; margin: 15px 0; border-radius: 5px; }"
+        "    .method { background: #007acc; color: white; padding: 3px 8px; border-radius: 3px; }"
+        "    pre { background: #f0f0f0; padding: 10px; overflow-x: auto; }"
+        "    .example { background: #e8f5e8; padding: 10px; margin: 10px 0; }"
+        "  </style>"
+        "</head>"
+        "<body>"
+        "  <h1>PG Analytics C Collector API</h1>"
+        "  <p>PostgreSQL monitoring and metrics collection API</p>"
+        "  <div class=\"endpoint\">"
+        "    <h3><span class=\"method\">GET</span> /health</h3>"
+        "    <p>Health check and service status</p>"
+        "    <div class=\"example\"><strong>Example:</strong> <code>curl http://localhost:8080/health</code></div>"
+        "  </div>"
+        "  <div class=\"endpoint\">"
+        "    <h3><span class=\"method\">GET</span> /metrics</h3>"
+        "    <p>Prometheus format metrics</p>"
+        "    <div class=\"example\"><strong>Example:</strong> <code>curl http://localhost:8080/metrics</code></div>"
+        "  </div>"
+        "  <div class=\"endpoint\">"
+        "    <h3><span class=\"method\">GET</span> /openapi.json</h3>"
+        "    <p>OpenAPI 3.0 specification</p>"
+        "  </div>"
+        "  <div class=\"endpoint\">"
+        "    <h3><span class=\"method\">GET</span> /swagger</h3>"
+        "    <p>Swagger UI interface</p>"
+        "  </div>"
+        "  <h2>Quick Links</h2>"
+        "  <ul>"
+        "    <li><a href=\"/health\">Health Check</a></li>"
+        "    <li><a href=\"/metrics\">Metrics</a></li>"
+        "    <li><a href=\"/swagger\">Swagger UI</a></li>"
+        "    <li><a href=\"/openapi.json\">OpenAPI Spec</a></li>"
+        "  </ul>"
+        "</body>"
+        "</html>";
+    
+    char response[BUFFER_SIZE * 2];
+    snprintf(response, sizeof(response),
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Type: text/html\r\n"
+        "Content-Length: %ld\r\n"
+        "Connection: close\r\n\r\n%s",
+        strlen(docs_html), docs_html);
+    
+    send(client_socket, response, strlen(response), 0);
+}
+
+// Send root page
+void send_root(int client_socket) {
+    const char* body = "PG Analytics C Collector v1.0\n"
+                      "===============================\n"
+                      "Status: Running\n"
+                      "Database: PostgreSQL\n\n"
+                      "Endpoints:\n"
+                      "  /health  - Health check (JSON)\n"
+                      "  /metrics - Prometheus metrics\n"
+                      "  /docs    - API documentation\n"
+                      "  /swagger - Swagger UI\n"
+                      "  /openapi.json - OpenAPI specification\n"
+                      "  /        - This information\n";
+    
+    char response[BUFFER_SIZE];
+    snprintf(response, sizeof(response),
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Type: text/plain\r\n"
+        "Content-Length: %ld\r\n"
+        "Connection: close\r\n\r\n%s",
+        strlen(body), body);
+    
+    send(client_socket, response, strlen(response), 0);
+}
+
+// Handle HTTP requests
+void handle_request(int client_socket) {
+    char buffer[BUFFER_SIZE];
+    ssize_t bytes_read = recv(client_socket, buffer, BUFFER_SIZE - 1, 0);
+    
+    if (bytes_read <= 0) {
+        close(client_socket);
+        return;
+    }
+    
+    buffer[bytes_read] = '\0';
+    
+    // Parse HTTP request
+    char method[16], path[256], version[16];
+    if (sscanf(buffer, "%15s %255s %15s", method, path, version) != 3) {
+        close(client_socket);
+        return;
+    }
+    
+    printf("Request: %s %s\n", method, path);
+    
+    // Route requests
+    if (strcmp(path, "/metrics") == 0) {
+        send_metrics(client_socket);
+    } else if (strcmp(path, "/health") == 0) {
+        send_health(client_socket);
+    } else if (strcmp(path, "/openapi.json") == 0) {
+        send_openapi_spec(client_socket);
+    } else if (strcmp(path, "/swagger") == 0) {
+        send_swagger_ui(client_socket);
+    } else if (strcmp(path, "/docs") == 0) {
+        send_docs(client_socket);
+    } else if (strcmp(path, "/") == 0) {
+        send_root(client_socket);
+    } else {
+        // 404 Not Found
+        const char* not_found = "HTTP/1.1 404 Not Found\r\n"
+                               "Content-Type: text/plain\r\n"
+                               "Connection: close\r\n\r\n"
+                               "404 Not Found\n";
+        send(client_socket, not_found, strlen(not_found), 0);
+    }
+    
+    close(client_socket);
+}
+
+int main() {
+    printf("PG Analytics C Collector v1.0 starting...\n");
+    
+    // Try initial database connection
+    if (connect_database()) {
+        printf("Initial database connection established\n");
+    } else {
+        printf("Initial connection failed, will retry during operation\n");
+    }
+    
+    // Create socket
+    int server_socket = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_socket == -1) {
+        perror("socket");
+        return 1;
+    }
+    
+    // Set socket options
+    int opt = 1;
+    setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    
+    // Bind socket
+    struct sockaddr_in server_addr;
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = INADDR_ANY;
+    server_addr.sin_port = htons(PORT);
+    
+    if (bind(server_socket, (struct sockaddr*)&server_addr, sizeof(server_addr)) == -1) {
+        perror("bind");
+        close(server_socket);
+        return 1;
+    }
+    
+    // Listen
+    if (listen(server_socket, 10) == -1) {
+        perror("listen");
+        close(server_socket);
+        return 1;
+    }
+    
+    printf("Server started on port %d\n", PORT);
+    printf("Endpoints: /health /metrics /docs /swagger /openapi.json /\n");
+    
+    // Collect initial metrics
+    collect_real_metrics();
+    
+    // Main server loop
+    while (1) {
+        struct sockaddr_in client_addr;
+        socklen_t client_len = sizeof(client_addr);
+        
+        int client_socket = accept(server_socket, (struct sockaddr*)&client_addr, &client_len);
+        if (client_socket == -1) {
+            perror("accept");
+            continue;
+        }
+        
+        handle_request(client_socket);
+        
+        // Collect metrics periodically (every 10 requests or so)
+        static int request_count = 0;
+        if (++request_count % 10 == 0) {
+            collect_real_metrics();
+        }
+    }
+    
+    // Cleanup
+    close(server_socket);
+    if (conn) PQfinish(conn);
+    
+    return 0;
+}

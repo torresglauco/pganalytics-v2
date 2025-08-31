@@ -14,6 +14,7 @@
 #define BUFFER_SIZE 4096
 #define MAX_CONNECTIONS 100
 
+// Estruturas globais para métricas
 typedef struct {
     int total_connections;
     int active_connections;
@@ -26,13 +27,14 @@ static metrics_t global_metrics = {0};
 static pthread_mutex_t metrics_mutex = PTHREAD_MUTEX_INITIALIZER;
 static int running = 1;
 
-// Database configuration
+// Configurações do banco
 static const char* db_host = "pganalytics-postgres";
 static const char* db_port = "5432";
 static const char* db_name = "pganalytics";
 static const char* db_user = "pganalytics";
 static const char* db_password = "pganalytics123";
 
+// Forward declarations
 void handle_request(int client_socket);
 void send_response(int socket, const char* status, const char* content_type, const char* body);
 void send_file_response(int socket, const char* content_type, const char* content);
@@ -41,13 +43,13 @@ void update_metrics();
 int connect_database();
 void signal_handler(int sig);
 
-// OpenAPI specification content
-const char* openapi_json = 
+// Conteúdo da documentação OpenAPI
+const char* openapi_json = \
 "{"
 "\"openapi\": \"3.0.3\","
 "\"info\": {"
 "\"title\": \"PG Analytics Collector API\","
-"\"description\": \"API para coleta de metricas PostgreSQL em tempo real\","
+"\"description\": \"API para coleta de métricas PostgreSQL em tempo real\","
 "\"version\": \"1.0.0\""
 "},"
 "\"servers\": [{\"url\": \"http://localhost:8080\"}],"
@@ -73,8 +75,8 @@ const char* openapi_json =
 "}"
 "}";
 
-// Swagger UI HTML content
-const char* swagger_html = 
+// Conteúdo do Swagger UI
+const char* swagger_html = \
 "<!DOCTYPE html>"
 "<html><head><title>PG Analytics API</title>"
 "<link rel=\"stylesheet\" href=\"https://unpkg.com/swagger-ui-dist@3.52.5/swagger-ui.css\"/>"
@@ -100,9 +102,6 @@ int connect_database() {
              "host=%s port=%s dbname=%s user=%s password=%s connect_timeout=10",
              db_host, db_port, db_name, db_user, db_password);
     
-    printf("Connecting to database: host=%s port=%s dbname=%s user=%s\n", 
-           db_host, db_port, db_name, db_user);
-    
     PGconn *conn = PQconnectdb(conninfo);
     
     if (PQstatus(conn) != CONNECTION_OK) {
@@ -111,7 +110,6 @@ int connect_database() {
         return 0;
     }
     
-    printf("Connected to PostgreSQL successfully!\n");
     PQfinish(conn);
     return 1;
 }
@@ -129,14 +127,14 @@ void update_metrics() {
     if (PQstatus(conn) == CONNECTION_OK) {
         global_metrics.database_connected = 1;
         
-        // Query for total connections
+        // Query para total de conexões
         PGresult *res = PQexec(conn, "SELECT count(*) FROM pg_stat_activity;");
         if (PQresultStatus(res) == PGRES_TUPLES_OK && PQntuples(res) > 0) {
             global_metrics.total_connections = atoi(PQgetvalue(res, 0, 0));
         }
         PQclear(res);
         
-        // Query for active connections
+        // Query para conexões ativas
         res = PQexec(conn, "SELECT count(*) FROM pg_stat_activity WHERE state = 'active';");
         if (PQresultStatus(res) == PGRES_TUPLES_OK && PQntuples(res) > 0) {
             global_metrics.active_connections = atoi(PQgetvalue(res, 0, 0));
@@ -150,14 +148,12 @@ void update_metrics() {
             if (ratio_str && strlen(ratio_str) > 0) {
                 global_metrics.cache_hit_ratio = atof(ratio_str);
             } else {
-                global_metrics.cache_hit_ratio = 0.98;
+                global_metrics.cache_hit_ratio = 0.98;  // Default value
             }
         }
         PQclear(res);
         
         global_metrics.last_update = time(NULL);
-        printf("Metrics updated: %d total, %d active connections\n", 
-               global_metrics.total_connections, global_metrics.active_connections);
     } else {
         global_metrics.database_connected = 0;
         printf("Database connection failed: %s\n", PQerrorMessage(conn));
@@ -176,6 +172,7 @@ void* metrics_collector_thread(void* arg) {
     while (running) {
         update_metrics();
         
+        // Aguarda 30 segundos ou até o programa terminar
         for (int i = 0; i < 30 && running; i++) {
             sleep(1);
         }
@@ -220,11 +217,13 @@ void handle_request(int client_socket) {
     
     buffer[bytes_received] = '\0';
     
+    // Parse HTTP method and path
     char method[16], path[256];
     sscanf(buffer, "%s %s", method, path);
     
     printf("Request: %s %s\n", method, path);
     
+    // Handle different endpoints
     if (strcmp(path, "/") == 0) {
         const char* response_body = 
             "{\"service\": \"pg-analytics-collector\", "
@@ -335,44 +334,55 @@ void handle_request(int client_socket) {
 int main() {
     printf("PG Analytics C Collector v1.0 starting...\n");
     
+    // Setup signal handlers
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
     
+    // Test database connection
     printf("Testing database connection...\n");
     if (!connect_database()) {
         printf("Warning: Database connection failed, continuing anyway\n");
+    } else {
+        printf("Database connection successful\n");
     }
     
+    // Initial metrics update
     update_metrics();
     
+    // Start metrics collector thread
     pthread_t metrics_thread;
     if (pthread_create(&metrics_thread, NULL, metrics_collector_thread, NULL) != 0) {
         printf("Failed to create metrics thread: %s\n", strerror(errno));
         return 1;
     }
     
+    // Create socket
     int server_socket = socket(AF_INET, SOCK_STREAM, 0);
     if (server_socket < 0) {
         printf("Error creating socket\n");
         return 1;
     }
     
+    // Enable SO_REUSEADDR
     int opt = 1;
     if (setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
         printf("Warning: setsockopt failed\n");
     }
     
+    // Setup server address
     struct sockaddr_in server_addr;
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = INADDR_ANY;
     server_addr.sin_port = htons(PORT);
     
+    // Bind socket
     if (bind(server_socket, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
         printf("Error binding socket: %s\n", strerror(errno));
         close(server_socket);
         return 1;
     }
     
+    // Listen for connections
     if (listen(server_socket, MAX_CONNECTIONS) < 0) {
         printf("Error listening: %s\n", strerror(errno));
         close(server_socket);
@@ -388,6 +398,7 @@ int main() {
     printf("  GET /docs      - API documentation (alias)\n");
     printf("  GET /openapi.json - OpenAPI specification\n");
     
+    // Main server loop
     while (running) {
         struct sockaddr_in client_addr;
         socklen_t client_len = sizeof(client_addr);
@@ -403,9 +414,11 @@ int main() {
         handle_request(client_socket);
     }
     
+    // Cleanup
     printf("Shutting down server...\n");
     close(server_socket);
     
+    // Wait for metrics thread to finish
     printf("Waiting for metrics thread...\n");
     pthread_join(metrics_thread, NULL);
     
