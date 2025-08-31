@@ -1,0 +1,196 @@
+# PG Analytics v2 - Environment Configuration
+# Copy this file to .env and customize for your environment
+
+# ================================
+# PostgreSQL Configuration
+# ================================
+POSTGRES_DB=pganalytics
+POSTGRES_USER=admin
+POSTGRES_PASSWORD=admin123
+POSTGRES_HOST=postgres
+POSTGRES_PORT=5432
+
+# PostgreSQL Performance Settings
+POSTGRES_SHARED_BUFFERS=256MB
+POSTGRES_EFFECTIVE_CACHE_SIZE=1GB
+POSTGRES_WORK_MEM=4MB
+POSTGRES_MAINTENANCE_WORK_MEM=64MB
+POSTGRES_MAX_CONNECTIONS=100
+
+# ================================
+# C Collector Configuration
+# ================================
+COLLECTOR_SCRAPE_INTERVAL=10s
+COLLECTOR_DB_HOST=postgres
+COLLECTOR_DB_PORT=5432
+COLLECTOR_DB_NAME=pganalytics
+COLLECTOR_DB_USER=admin
+COLLECTOR_DB_PASSWORD=admin123
+COLLECTOR_HTTP_PORT=8080
+COLLECTOR_LOG_LEVEL=info
+
+# ================================
+# Prometheus Configuration  
+# ================================
+PROMETHEUS_SCRAPE_INTERVAL=15s
+PROMETHEUS_EVALUATION_INTERVAL=15s
+PROMETHEUS_RETENTION_TIME=30d
+PROMETHEUS_RETENTION_SIZE=50GB
+PROMETHEUS_HTTP_PORT=9090
+
+# ================================
+# Grafana Configuration
+# ================================
+GF_SECURITY_ADMIN_USER=admin
+GF_SECURITY_ADMIN_PASSWORD=admin
+GF_SERVER_HTTP_PORT=3000
+GF_SERVER_PROTOCOL=http
+GF_SERVER_DOMAIN=localhost
+
+# Grafana Database (optional - uses SQLite by default)
+# GF_DATABASE_TYPE=postgres
+# GF_DATABASE_HOST=postgres:5432
+# GF_DATABASE_NAME=grafana
+# GF_DATABASE_USER=grafana
+# GF_DATABASE_PASSWORD=grafana_password
+
+# Grafana Authentication (optional)
+# GF_AUTH_LDAP_ENABLED=false
+# GF_AUTH_LDAP_CONFIG_FILE=/etc/grafana/ldap.toml
+
+# Grafana SMTP (optional)
+# GF_SMTP_ENABLED=false
+# GF_SMTP_HOST=localhost:587
+# GF_SMTP_USER=
+# GF_SMTP_PASSWORD=
+# GF_SMTP_FROM_ADDRESS=admin@grafana.localhost
+
+# ================================
+# Security Configuration
+# ================================
+# Set to true in production
+ENABLE_SSL=false
+SSL_CERT_PATH=./ssl/cert.pem
+SSL_KEY_PATH=./ssl/key.pem
+
+# JWT Secret (change in production)
+JWT_SECRET=your-super-secret-jwt-key-change-in-production
+
+# ================================
+# Logging Configuration
+# ================================
+LOG_LEVEL=info
+LOG_FORMAT=json
+
+# ================================
+# Monitoring & Alerting
+# ================================
+# AlertManager (optional)
+ALERTMANAGER_ENABLED=false
+ALERTMANAGER_URL=http://alertmanager:9093
+
+# Slack Integration (optional)
+SLACK_WEBHOOK_URL=
+SLACK_CHANNEL=#alerts
+
+# Email Alerts (optional)
+EMAIL_SMTP_HOST=
+EMAIL_SMTP_PORT=587
+EMAIL_FROM=alerts@pganalytics.local
+EMAIL_TO=admin@company.com
+
+# ================================
+# Backup Configuration
+# ================================
+BACKUP_ENABLED=true
+BACKUP_SCHEDULE=0 2 * * *  # Daily at 2 AM
+BACKUP_RETENTION_DAYS=30
+BACKUP_S3_BUCKET=
+BACKUP_S3_REGION=
+BACKUP_S3_ACCESS_KEY=
+BACKUP_S3_SECRET_KEY=
+
+# ================================
+# Performance Tuning
+# ================================
+# Docker resource limits
+POSTGRES_MEMORY_LIMIT=2g
+COLLECTOR_MEMORY_LIMIT=512m
+PROMETHEUS_MEMORY_LIMIT=2g
+GRAFANA_MEMORY_LIMIT=1g
+
+# Network settings
+NETWORK_NAME=pganalytics_network
+NETWORK_DRIVER=bridge
+
+# ================================
+# Development Settings
+# ================================
+# Set to true for development
+DEVELOPMENT_MODE=false
+DEBUG_MODE=false
+ENABLE_PROFILING=false
+
+# Hot reload for development
+ENABLE_HOT_RELOAD=false
+
+# ================================
+# Enterprise Features
+# ================================
+# High Availability
+ENABLE_HA=false
+CLUSTER_SIZE=3
+
+# Load Balancing
+ENABLE_LOAD_BALANCER=false
+LOAD_BALANCER_TYPE=nginx
+
+# Auto-scaling
+ENABLE_AUTO_SCALING=false
+MIN_REPLICAS=1
+MAX_REPLICAS=5
+
+# ================================
+# Compliance & Audit
+# ================================
+ENABLE_AUDIT_LOG=false
+AUDIT_LOG_LEVEL=info
+RETAIN_AUDIT_LOGS_DAYS=365
+
+# Data Encryption
+ENABLE_ENCRYPTION_AT_REST=false
+ENCRYPTION_KEY=
+
+# ================================
+# External Integrations
+# ================================
+# External PostgreSQL monitoring
+EXTERNAL_POSTGRES_HOSTS=
+EXTERNAL_POSTGRES_CREDENTIALS=
+
+# Cloud providers
+AWS_REGION=
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+
+AZURE_SUBSCRIPTION_ID=
+AZURE_CLIENT_ID=
+AZURE_CLIENT_SECRET=
+
+GCP_PROJECT_ID=
+GCP_SERVICE_ACCOUNT_KEY=
+
+# ================================
+# Custom Metrics
+# ================================
+ENABLE_CUSTOM_METRICS=false
+CUSTOM_METRICS_CONFIG_PATH=./config/custom_metrics.yml
+
+# ================================
+# Feature Flags
+# ================================
+FEATURE_SLOW_QUERY_ANALYSIS=true
+FEATURE_CONNECTION_POOLING=true
+FEATURE_AUTOMATED_BACKUPS=true
+FEATURE_REAL_TIME_ALERTS=true
+FEATURE_DASHBOARD_SHARING=true

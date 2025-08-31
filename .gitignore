@@ -1,84 +1,79 @@
-# Environment files
-.env
-.env.local
-.env.*.local
+# 🔒 PG Analytics v2 - .gitignore Enterprise
+# ==========================================
 
-# Dependencies
+# ARQUIVOS SENSÍVEIS - NUNCA COMMITAR
+.env
+.env.*
+!.env.example
+secrets/
+private/
+*.pem
+*.key
+*.p12
+*.pfx
+*.credentials
+CREDENCIAIS_*.txt
+credentials_*.txt
+auth_*.json
+service_account*.json
+*.crt
+*.cer
+
+# BUILD E DEPENDÊNCIAS
+vendor/
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+bin/
+dist/
+coverage.out
 node_modules/
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
 .Python
+build/
+*.egg-info/
+.venv/
 env/
 venv/
-.venv/
-pip-log.txt
-pip-delete-this-directory.txt
 
-# IDE
+# IDEs E EDITORES
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-
-# OS
 .DS_Store
-.DS_Store?
 ._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
 
-# Build artifacts
-dist/
-build/
-*.egg-info/
-.coverage
-.pytest_cache/
-
-# Docker
-.dockerignore
-
-# Logs
+# TEMPORÁRIOS E LOGS
 *.log
 logs/
-
-# Temporary files
 *.tmp
 *.temp
 .cache/
-
-# Backup files
 *.backup
 *.bak
 *.old
+*-FIXED
+*-temp
+temp/
+tmp/
 
-# Local database
-*.db
-*.sqlite
-*.sqlite3
-
-# Frontend specific
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.next/
-.nuxt/
-.vuepress/dist
-
-# Backend specific
-*.pyc
-__pycache__/
-instance/
-.webassets-cache
-
-# Monitoring
+# DOCKER E DADOS
+docker-compose.override.yml
 prometheus_data/
 grafana_data/
+pgdata/
+postgres_data/
 
-# Arquivos de credenciais (nunca commitar)
-CREDENCIAIS_*.txt
-*.credentials
+# DESENVOLVIMENTO
+.air.toml
+air_tmp/
+debug
+*.prof
+pprof/

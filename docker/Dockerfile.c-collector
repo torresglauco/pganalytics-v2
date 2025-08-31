@@ -1,0 +1,39 @@
+FROM alpine:3.18
+
+# Instalar dependências mínimas
+RUN apk add --no-cache \
+    gcc \
+    musl-dev \
+    postgresql-dev \
+    postgresql-client \
+    make \
+    curl
+
+# Criar diretório de trabalho
+WORKDIR /app
+
+# Copiar código fonte
+COPY monitoring/c-collector/ .
+
+# Verificar arquivos
+RUN ls -la
+
+# Compilar com path explícito para PostgreSQL
+RUN gcc -Wall -std=c99 -I/usr/include/postgresql -o collector main.c -lpq
+
+# Criar usuário não-root
+RUN adduser -D -s /bin/sh collector && \
+    chown collector:collector /app/collector
+
+# Usar usuário não-root
+USER collector
+
+# Expor porta
+EXPOSE 8080
+
+# Health check simples
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+# Comando de entrada
+CMD ["./collector"]

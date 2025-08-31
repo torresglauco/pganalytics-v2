@@ -1,0 +1,10 @@
+#!/bin/bash
+echo "🔒 Verificando segurança..."
+STAGED=$(git diff --cached --name-only)
+for file in $STAGED; do
+    [[ "$file" == *.env ]] || [[ "$file" == *.pem ]] || [[ "$file" == *.key ]] && {
+        echo "❌ Arquivo sensível: $file"
+        exit 1
+    }
+done
+echo "✅ Segurança OK"

@@ -1,38 +1,85 @@
+version: '3.8'
+
+networks:
+  pganalytics_network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  grafana-data:
+
 services:
   postgres:
     image: postgres:15
     container_name: pganalytics-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_DB: pganalytics
-      POSTGRES_USER: pganalytics
-      POSTGRES_PASSWORD: pganalytics123
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin123
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - pganalytics_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U pganalytics -d pganalytics"]
+      test: ["CMD-SHELL", "pg_isready -U admin -d pganalytics"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  api:
-    build: .
-    container_name: pganalytics-api
+  c-bypass-collector:
+    build:
+      context: .
+      dockerfile: Dockerfile.c-collector
+    container_name: pganalytics-c-bypass-collector
+    restart: unless-stopped
     ports:
       - "8080:8080"
-    environment:
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER: pganalytics
-      DB_PASSWORD: pganalytics123
-      DB_NAME: pganalytics
-      PORT: 8080
-      GIN_MODE: debug
+    networks:
+      - pganalytics_network
     depends_on:
       postgres:
         condition: service_healthy
-    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-volumes:
-  postgres_data:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: pganalytics-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    networks:
+      - pganalytics_network
+    depends_on:
+      - c-bypass-collector
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: pganalytics-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=
+    volumes:
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    networks:
+      - pganalytics_network
+    depends_on:
+      - prometheus

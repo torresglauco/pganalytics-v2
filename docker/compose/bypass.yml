@@ -1,0 +1,100 @@
+# 🔄 PG Analytics v2 - Setup Bypass (Recomendado)
+# ===============================================
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: pganalytics-postgres
+    environment:
+      POSTGRES_DB: pganalytics
+      POSTGRES_USER: pganalytics
+      POSTGRES_PASSWORD: pganalytics123
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./../../migrations:/docker-entrypoint-initdb.d/
+    networks:
+      - pganalytics
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pganalytics -d pganalytics"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  c-bypass-collector:
+    build:
+      context: ../../
+      dockerfile: docker/Dockerfile.c-collector
+    container_name: pganalytics-c-bypass-collector
+    environment:
+      - DATABASE_URL=postgresql://pganalytics:pganalytics123@postgres:5432/pganalytics
+      - METRICS_PORT=8080
+      - METRICS_INTERVAL=30s
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - pganalytics
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/metrics"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: pganalytics-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./../../monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    networks:
+      - pganalytics
+    depends_on:
+      - c-bypass-collector
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: pganalytics-grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./../../monitoring/grafana/provisioning:/etc/grafana/provisioning
+    networks:
+      - pganalytics
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    name: pganalytics_postgres_data
+  prometheus_data:
+    name: pganalytics_prometheus_data
+  grafana_data:
+    name: pganalytics_grafana_data
+
+networks:
+  pganalytics:
+    name: pganalytics_network
+    driver: bridge

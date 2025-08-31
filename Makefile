@@ -1,94 +1,124 @@
-# Makefile for PGAnalytics Backend
+# 🏆 PG Analytics v2 - Enterprise Makefile
+# ========================================
 
-.PHONY: help dev build clean test docs deps security lint fmt vet
+.PHONY: help build run test clean
 
-# Variables
-GO_VERSION := 1.23
-APP_NAME := pganalytics-backend
-DOCKER_IMAGE := $(APP_NAME):latest
+APP_NAME=pganalytics
+VERSION=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+BUILD_TIME=$(shell date -u '+%Y-%m-%d_%H:%M:%S')
 
-help: ## Show this help message
-	@echo 'Usage: make [target]'
-	@echo ''
-	@echo 'Targets:'
-	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+help: ## 📋 Mostrar ajuda
+	@echo "🏆 PG Analytics v2 - Comandos Enterprise"
+	@echo "========================================"
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
-dev: ## Start development environment
-	@echo "🚀 Starting PGAnalytics development environment..."
-	docker-compose up --build
+# 🔨 BUILD E EXECUÇÃO
+build: ## 🔨 Build da aplicação
+	@echo "🔨 Building $(APP_NAME) v$(VERSION)..."
+	go build -ldflags "-X main.version=$(VERSION) -X main.buildTime=$(BUILD_TIME)" -o bin/$(APP_NAME) main.go
 
-build: ## Build the application
-	@echo "🔨 Building $(APP_NAME)..."
-	docker-compose build
+run: ## 🚀 Executar aplicação
+	@echo "🚀 Iniciando $(APP_NAME)..."
+	go run main.go
 
-clean: ## Clean up containers and images
-	@echo "🧹 Cleaning up..."
-	docker-compose down -v
-	docker system prune -f
+dev: ## 🛠️ Desenvolvimento com live reload
+	@echo "🛠️  Modo desenvolvimento..."
+	air
 
-test: ## Run tests
-	@echo "🧪 Running tests..."
+# 🧪 TESTES
+test: ## 🧪 Testes unitários
+	@echo "🧪 Executando testes..."
 	go test -v ./...
-	go test -race -coverprofile=coverage.out ./...
 
-test-coverage: ## Run tests with coverage report
-	@echo "📊 Running tests with coverage..."
-	go test -coverprofile=coverage.out ./...
-	go tool cover -html=coverage.out -o coverage.html
-	@echo "Coverage report: coverage.html"
+test-api: ## 🌐 Testes de API
+	@echo "🌐 Testando API..."
+	chmod +x tests/test_api.sh && ./tests/test_api.sh
 
-docs: ## Generate API documentation
-	@echo "📚 Generating API documentation..."
-	swag init -g cmd/server/main.go
-	@echo "Swagger docs will be available at /swagger/index.html"
+test-all: ## 🎯 Todos os testes
+	@echo "🎯 Executando todos os testes..."
+	make test && make test-api
 
-deps: ## Download dependencies
-	@echo "📦 Downloading dependencies..."
-	go mod download
-	go mod tidy
+# 🐳 DOCKER COMPOSE - SETUPS
+compose-bypass: ## 🔄 Setup bypass (recomendado)
+	@echo "🔄 Iniciando setup bypass..."
+	docker-compose -f docker/compose/bypass.yml up -d
 
-security: ## Run security scan
-	@echo "🔒 Running security scan..."
-	go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
-	gosec ./...
+compose-monitoring: ## 📊 Setup monitoramento completo
+	@echo "📊 Iniciando monitoramento..."
+	docker-compose -f docker/compose/monitoring.yml up -d
 
-lint: ## Run linter
-	@echo "🔍 Running linter..."
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-	golangci-lint run
+compose-otel: ## 🔍 Setup OpenTelemetry
+	@echo "🔍 Iniciando OpenTelemetry..."
+	docker-compose -f docker/compose/otel.yml up -d
 
-fmt: ## Format code
-	@echo "✨ Formatting code..."
-	go fmt ./...
+compose-prod: ## 🚀 Setup produção
+	@echo "🚀 Iniciando produção..."
+	docker-compose -f docker/compose/production.yml up -d
 
-vet: ## Run go vet
-	@echo "🔎 Running go vet..."
-	go vet ./...
+compose-down: ## ⏹️ Parar todos os serviços
+	@echo "⏹️  Parando serviços..."
+	@for file in docker/compose/*.yml; do docker-compose -f "$$file" down 2>/dev/null || true; done
+	@docker-compose down 2>/dev/null || true
 
-logs: ## Show application logs
-	docker-compose logs -f api
+# 🛠️ UTILITÁRIOS
+status: ## 📊 Status do sistema
+	@./scripts/system_status.sh
 
-restart: ## Restart the API service
-	@echo "🔄 Restarting API service..."
-	docker-compose restart api
+security-check: ## 🔒 Verificação de segurança
+	@./scripts/security_check.sh
 
-install-tools: ## Install development tools
-	@echo "🛠️  Installing development tools..."
-	go install github.com/swaggo/swag/cmd/swag@latest
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-	go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+setup: ## ⚙️ Setup inicial
+	@./scripts/setup.sh
 
-pre-commit: fmt vet lint security test ## Run all pre-commit checks
+logs: ## 📝 Ver logs
+	@docker-compose logs -f
 
-ci: deps docs build test security ## Run CI pipeline locally
+# 🧹 LIMPEZA
+clean: ## 🧹 Limpeza básica
+	@echo "🧹 Limpando arquivos temporários..."
+	@rm -rf bin/ tmp/ *.log coverage.out air_tmp/
 
-deploy-prod: ## Deploy to production
-	@echo "🚀 Deploying to production..."
-	docker-compose -f docker-compose.prod.yml up -d
+clean-docker: ## 🐳 Limpeza Docker completa
+	@echo "🐳 Limpeza Docker completa..."
+	@make compose-down
+	@docker system prune -af
+	@docker volume prune -f
 
-status: ## Show service status
-	@echo "📊 Service status:"
-	docker-compose ps
+# 📚 DOCUMENTAÇÃO
+docs: ## 📚 Gerar documentação
+	@echo "📚 Gerando documentação..."
+	@command -v swag >/dev/null && swag init -g main.go || echo "⚠️  swag não instalado"
+
+# 📈 MÉTRICAS E MONITORAMENTO
+metrics: ## 📈 Ver métricas
+	@echo "📈 Métricas atuais:"
+	@curl -s http://localhost:8080/metrics | head -20 || echo "❌ Serviço não disponível"
+
+health: ## 🏥 Health check
+	@echo "🏥 Verificando saúde dos serviços..."
+	@curl -s http://localhost:8080/health || echo "❌ API offline"
+	@curl -s http://localhost:9090/-/ready || echo "❌ Prometheus offline"
+	@curl -s http://localhost:3000/api/health || echo "❌ Grafana offline"
+
+# 🔮 VERSÃO E INFO
+version: ## 📋 Mostrar versão
+	@echo "🏆 $(APP_NAME) v$(VERSION)"
+	@echo "📅 Build: $(BUILD_TIME)"
+	@echo "🐹 Go: $(shell go version)"
+
+info: ## ℹ️ Informações do projeto
+	@echo "🏆 PG Analytics v2 - Sistema Enterprise de Monitoramento PostgreSQL"
+	@echo "=============================================================="
+	@echo "📊 Componentes:"
+	@echo "  • API Go com JWT"
+	@echo "  • Coletor C OpenTelemetry"
+	@echo "  • Prometheus + Grafana"
+	@echo "  • PostgreSQL Analytics"
 	@echo ""
-	@echo "🌐 Health check:"
-	curl -s http://localhost:8080/health | jq . || echo "API not responding"
+	@echo "🌐 Endpoints:"
+	@echo "  • API: http://localhost:8080"
+	@echo "  • Swagger: http://localhost:8080/swagger/"
+	@echo "  • Grafana: http://localhost:3000 (admin/admin)"
+	@echo "  • Prometheus: http://localhost:9090"
+
+.DEFAULT_GOAL := help

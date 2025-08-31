@@ -1,25 +1,15 @@
-CC = gcc
-CFLAGS = -Wall -Wextra -std=c99 -O2
-LDFLAGS = -lpq -lmicrohttpd -lpthread
-
-SRCDIR = src
-OBJDIR = obj
-SOURCES = $(wildcard $(SRCDIR)/*.c)
-OBJECTS = $(SOURCES:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
-TARGET = pg_metrics_collector
-
-.PHONY: all clean
+CC=gcc
+CFLAGS=-Wall -Wextra -std=c99 -I/usr/include/postgresql
+LIBS=-lpq
+TARGET=collector
+SOURCE=main.c
 
 all: $(TARGET)
 
-$(TARGET): $(OBJECTS) | $(OBJDIR)
-	$(CC) $(OBJECTS) -o $@ $(LDFLAGS)
-
-$(OBJDIR)/%.o: $(SRCDIR)/%.c | $(OBJDIR)
-	$(CC) $(CFLAGS) -c $< -o $@
-
-$(OBJDIR):
-	mkdir -p $(OBJDIR)
+$(TARGET): $(SOURCE)
+	$(CC) $(CFLAGS) -o $(TARGET) $(SOURCE) $(LIBS)
 
 clean:
-	rm -rf $(OBJDIR) $(TARGET)
+	rm -f $(TARGET)
+
+.PHONY: all clean

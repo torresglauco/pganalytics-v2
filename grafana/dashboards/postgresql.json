@@ -1,0 +1,50 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "PostgreSQL Analytics",
+    "tags": ["postgresql", "database"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "PostgreSQL Connections",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "pganalytics_postgresql_connections",
+            "legendFormat": "Connections"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "green", "value": null},
+                {"color": "yellow", "value": 50},
+                {"color": "red", "value": 80}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Collector Status",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "pganalytics_collector_info",
+            "legendFormat": "{{type}} v{{version}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+      }
+    ],
+    "time": {"from": "now-1h", "to": "now"},
+    "refresh": "30s"
+  }
+}

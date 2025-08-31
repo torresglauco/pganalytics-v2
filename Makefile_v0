@@ -1,0 +1,218 @@
+# PG Analytics v2 - Makefile
+# Enterprise-grade PostgreSQL monitoring platform
+
+.PHONY: help build start stop restart status logs clean health backup restore
+
+# Default target
+help: ## Show this help message
+	@echo "PG Analytics v2 - Available Commands:"
+	@echo "======================================"
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
+
+# Build and deployment commands
+build: ## Build all Docker images
+	@echo "🔨 Building Docker images..."
+	docker-compose build
+
+build-no-cache: ## Build all Docker images without cache
+	@echo "🔨 Building Docker images (no cache)..."
+	docker-compose build --no-cache
+
+start: ## Start all services
+	@echo "🚀 Starting PG Analytics stack..."
+	docker-compose up -d
+	@echo "✅ Stack started. Run 'make status' to verify."
+
+stop: ## Stop all services
+	@echo "⏹️  Stopping PG Analytics stack..."
+	docker-compose down
+
+restart: ## Restart all services
+	@echo "🔄 Restarting PG Analytics stack..."
+	docker-compose restart
+
+# Quick deployment
+deploy: ## Clean deployment (stop, clean, build, start)
+	@echo "🚀 Deploying PG Analytics v2..."
+	make stop
+	make clean-containers
+	make build
+	make start
+	@echo "⏳ Waiting for services to be ready..."
+	sleep 60
+	make health
+
+# Status and monitoring commands
+status: ## Show status of all services
+	@echo "📊 PG Analytics Status:"
+	@echo "======================"
+	docker-compose ps
+	@echo ""
+	@echo "🌐 Service URLs:"
+	@echo "  • PostgreSQL: localhost:5432 (admin/admin123)"
+	@echo "  • C Collector: http://localhost:8080"
+	@echo "  • Prometheus: http://localhost:9090"
+	@echo "  • Grafana: http://localhost:3000 (admin/admin)"
+
+health: ## Perform health checks on all services
+	@echo "🔍 Health Check Report:"
+	@echo "======================"
+	@./scripts/health_check.sh || echo "Health check script not found. Creating..."
+	@if [ ! -f "./scripts/health_check.sh" ]; then 		mkdir -p scripts; 		echo '#!/bin/bash' > scripts/health_check.sh; 		echo 'echo "🐳 Container Status:"' >> scripts/health_check.sh; 		echo 'docker-compose ps' >> scripts/health_check.sh; 		echo 'echo ""' >> scripts/health_check.sh; 		echo 'echo "🌐 Service Tests:"' >> scripts/health_check.sh; 		echo 'curl -sf http://localhost:8080/health && echo "✅ C Collector: Healthy" || echo "❌ C Collector: Failed"' >> scripts/health_check.sh; 		echo 'curl -sf http://localhost:9090/-/ready && echo "✅ Prometheus: Ready" || echo "❌ Prometheus: Not Ready"' >> scripts/health_check.sh; 		echo 'curl -sf http://localhost:3000/api/health && echo "✅ Grafana: Healthy" || echo "❌ Grafana: Failed"' >> scripts/health_check.sh; 		echo 'docker exec pganalytics-postgres pg_isready -U admin -d pganalytics >/dev/null 2>&1 && echo "✅ PostgreSQL: Connected" || echo "❌ PostgreSQL: Failed"' >> scripts/health_check.sh; 		chmod +x scripts/health_check.sh; 		./scripts/health_check.sh; 	fi
+
+logs: ## Show logs from all services
+	docker-compose logs -f
+
+logs-collector: ## Show C collector logs
+	docker-compose logs -f c-bypass-collector
+
+logs-postgres: ## Show PostgreSQL logs
+	docker-compose logs -f postgres
+
+logs-prometheus: ## Show Prometheus logs
+	docker-compose logs -f prometheus
+
+logs-grafana: ## Show Grafana logs
+	docker-compose logs -f grafana
+
+# Development commands
+dev-build: ## Build development environment
+	@echo "🛠️  Building development environment..."
+	docker-compose -f docker-compose.yml -f docker-compose.dev.yml build
+
+dev-start: ## Start development environment
+	@echo "🚀 Starting development environment..."
+	docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+
+# Maintenance commands
+clean: ## Clean Docker resources (containers, images, volumes)
+	@echo "🧹 Cleaning Docker resources..."
+	make stop
+	make clean-containers
+	make clean-volumes
+	make clean-images
+
+clean-containers: ## Remove all containers
+	@echo "🗑️  Removing containers..."
+	@docker ps -a | grep pganalytics | awk '{print $$1}' | xargs -r docker rm -f || true
+
+clean-volumes: ## Remove all volumes (WARNING: DATA LOSS)
+	@echo "⚠️  WARNING: This will delete all data!"
+	@read -p "Are you sure? [y/N] " -n 1 -r; 	if [[ $$REPLY =~ ^[Yy]$$ ]]; then 		echo ""; 		docker volume rm $$(docker volume ls -q | grep pganalytics) 2>/dev/null || true; 		echo "✅ Volumes removed"; 	else 		echo ""; 		echo "❌ Cancelled"; 	fi
+
+clean-images: ## Remove all built images
+	@echo "🗑️  Removing images..."
+	@docker images | grep pganalytics | awk '{print $$3}' | xargs -r docker rmi -f || true
+
+# Backup and restore commands
+backup: ## Create backup of all data
+	@echo "💾 Creating backup..."
+	@mkdir -p backups
+	@DATE=$$(date +%Y%m%d_%H%M%S); 	echo "Backing up to backups/pganalytics_$$DATE/"; 	mkdir -p "backups/pganalytics_$$DATE"; 	docker exec pganalytics-postgres pg_dump -U admin pganalytics | gzip > "backups/pganalytics_$$DATE/postgres.sql.gz"; 	docker exec pganalytics-prometheus tar czf - /prometheus > "backups/pganalytics_$$DATE/prometheus.tar.gz" 2>/dev/null || true; 	echo "✅ Backup completed: backups/pganalytics_$$DATE/"
+
+restore: ## Restore from backup (requires BACKUP_DIR variable)
+	@if [ -z "$(BACKUP_DIR)" ]; then 		echo "❌ Error: Please specify BACKUP_DIR"; 		echo "Usage: make restore BACKUP_DIR=backups/pganalytics_20240101_120000"; 		exit 1; 	fi
+	@echo "🔄 Restoring from $(BACKUP_DIR)..."
+	@if [ -f "$(BACKUP_DIR)/postgres.sql.gz" ]; then 		echo "Restoring PostgreSQL..."; 		gunzip -c "$(BACKUP_DIR)/postgres.sql.gz" | docker exec -i pganalytics-postgres psql -U admin pganalytics; 	fi
+	@echo "✅ Restore completed"
+
+# Metrics and monitoring
+metrics: ## Show current metrics from collector
+	@echo "📊 Current Metrics Sample:"
+	@echo "========================="
+	@curl -s http://localhost:8080/metrics | head -20 || echo "❌ Collector not available"
+
+prometheus-targets: ## Show Prometheus targets status
+	@echo "🎯 Prometheus Targets:"
+	@echo "====================="
+	@curl -s http://localhost:9090/api/v1/targets | jq '.data.activeTargets[] | {job: .labels.job, instance: .labels.instance, health: .health}' 2>/dev/null || echo "❌ Prometheus not available or jq not installed"
+
+grafana-health: ## Check Grafana health and data sources
+	@echo "📊 Grafana Status:"
+	@echo "=================="
+	@curl -s http://localhost:3000/api/health | jq '.' 2>/dev/null || echo "❌ Grafana not available or jq not installed"
+
+# Quick fixes
+fix-permissions: ## Fix file permissions
+	@echo "🔧 Fixing permissions..."
+	@chmod +x scripts/*.sh 2>/dev/null || true
+	@chmod +x *.sh 2>/dev/null || true
+
+fix-grafana: ## Fix Grafana issues
+	@echo "🔧 Fixing Grafana..."
+	docker-compose restart grafana
+	@echo "⏳ Waiting for Grafana to restart..."
+	@sleep 30
+	@curl -s http://localhost:3000/api/health && echo "✅ Grafana is healthy" || echo "❌ Grafana still has issues"
+
+# Configuration commands
+config-show: ## Show current configuration
+	@echo "⚙️  Current Configuration:"
+	@echo "=========================="
+	@echo "Docker Compose files:"
+	@ls -la docker-compose*.yml 2>/dev/null || echo "No docker-compose files found"
+	@echo ""
+	@echo "Environment files:"
+	@ls -la .env* 2>/dev/null || echo "No .env files found"
+	@echo ""
+	@echo "Active containers:"
+	@docker ps --format "table {{.Names}}	{{.Image}}	{{.Status}}	{{.Ports}}" | grep pganalytics || echo "No pganalytics containers running"
+
+config-validate: ## Validate docker-compose configuration
+	@echo "✅ Validating docker-compose configuration..."
+	docker-compose config
+
+# Installation helpers
+install-deps: ## Install system dependencies (Ubuntu/Debian)
+	@echo "📦 Installing dependencies..."
+	@which docker >/dev/null || (echo "Installing Docker..." && curl -fsSL https://get.docker.com -o get-docker.sh && sudo sh get-docker.sh)
+	@which docker-compose >/dev/null || (echo "Installing Docker Compose..." && sudo apt-get update && sudo apt-get install -y docker-compose)
+	@which curl >/dev/null || (echo "Installing curl..." && sudo apt-get install -y curl)
+	@which jq >/dev/null || (echo "Installing jq..." && sudo apt-get install -y jq)
+
+# Security commands
+security-scan: ## Run basic security checks
+	@echo "🔒 Security Scan:"
+	@echo "================"
+	@echo "Checking for default passwords..."
+	@grep -r "admin123\|admin\|password" .env* docker-compose*.yml 2>/dev/null || echo "✅ No obvious default passwords found"
+	@echo ""
+	@echo "Checking exposed ports..."
+	@docker ps --format "table {{.Names}}	{{.Ports}}" | grep pganalytics || echo "No containers running"
+
+# Advanced operations
+scale-prometheus: ## Scale Prometheus for high availability
+	@echo "📈 Scaling Prometheus..."
+	docker-compose up -d --scale prometheus=2
+
+monitor-resources: ## Monitor resource usage
+	@echo "📊 Resource Usage:"
+	@echo "=================="
+	@docker stats --no-stream --format "table {{.Container}}	{{.CPUPerc}}	{{.MemUsage}}	{{.NetIO}}	{{.BlockIO}}" | grep pganalytics || echo "No pganalytics containers running"
+
+# Documentation
+docs: ## Generate documentation
+	@echo "📚 Documentation Links:"
+	@echo "======================"
+	@echo "• Main README: README.md"
+	@echo "• Monitoring Guide: MONITORING_README.md"
+	@echo "• Operations Guide: OPERATIONS_GUIDE.md"
+	@echo "• Grafana: http://localhost:3000 (admin/admin)"
+	@echo "• Prometheus: http://localhost:9090"
+
+# Complete reset (nuclear option)
+nuclear: ## Complete reset - removes everything (USE WITH CAUTION)
+	@echo "☢️  NUCLEAR RESET - This will destroy all data!"
+	@read -p "Are you absolutely sure? Type 'YES' to continue: " confirm; 	if [ "$$confirm" = "YES" ]; then 		echo "💥 Executing nuclear reset..."; 		docker-compose down --volumes --remove-orphans; 		docker system prune -af --volumes; 		docker volume prune -f; 		echo "✅ Nuclear reset completed"; 	else 		echo "❌ Cancelled"; 	fi
+
+# Version information
+version: ## Show version information
+	@echo "🏷️  PG Analytics v2 - Version Information:"
+	@echo "=========================================="
+	@echo "Docker version:"
+	@docker --version
+	@echo "Docker Compose version:"
+	@docker-compose --version
+	@echo ""
+	@echo "Container versions:"
+	@docker images | grep -E "(postgres|grafana|prom)" | head -10
