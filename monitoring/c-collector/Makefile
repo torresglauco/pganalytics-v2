@@ -1,6 +1,6 @@
 CC=gcc
-CFLAGS=-Wall -Wextra -std=c99 -I/usr/include/postgresql
-LIBS=-lpq
+CFLAGS=-Wall -std=c99 -I/usr/include/postgresql
+LIBS=-lpq -lpthread
 TARGET=collector
 SOURCE=main.c
 
@@ -11,5 +11,3 @@ $(TARGET): $(SOURCE)
 
 clean:
 	rm -f $(TARGET)
-
-.PHONY: all clean

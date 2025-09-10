@@ -2,413 +2,308 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <signal.h>
+#include <time.h>
+#include <pthread.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <time.h>
 #include <libpq-fe.h>
-#include <pthread.h>
-#include <errno.h>
-#include <signal.h>
 
 #define PORT 8080
 #define BUFFER_SIZE 4096
-#define MAX_CONNECTIONS 100
+#define MAX_TENANTS 100
 
 typedef struct {
-    int total_connections;
-    int active_connections;
-    float cache_hit_ratio;
-    time_t last_update;
+    char tenant_id[64];
+    char db_name[64];
+    char conn_string[256];
+    int active;
+    long total_connections;
+    long active_connections;
+    double cache_hit_ratio;
+    long database_size;
     int database_connected;
-} metrics_t;
+    time_t last_update;
+} tenant_metrics_t;
 
-static metrics_t global_metrics = {0};
-static pthread_mutex_t metrics_mutex = PTHREAD_MUTEX_INITIALIZER;
-static int running = 1;
+typedef struct {
+    tenant_metrics_t tenants[MAX_TENANTS];
+    int tenant_count;
+    pthread_mutex_t mutex;
+    int running;
+    time_t last_global_update;
+} global_metrics_t;
 
-// Database configuration
-static const char* db_host = "pganalytics-postgres";
-static const char* db_port = "5432";
-static const char* db_name = "pganalytics";
-static const char* db_user = "pganalytics";
-static const char* db_password = "pganalytics123";
+global_metrics_t global_metrics = {0};
 
-void handle_request(int client_socket);
-void send_response(int socket, const char* status, const char* content_type, const char* body);
-void send_file_response(int socket, const char* content_type, const char* content);
-void* metrics_collector_thread(void* arg);
-void update_metrics();
-int connect_database();
-void signal_handler(int sig);
+char *db_host = "postgres";
+char *db_port = "5432";
+char *db_name = "pganalytics";
+char *db_user = "admin";
+char *db_password = "admin123";
 
-// OpenAPI specification content
-const char* openapi_json = 
-"{"
-"\"openapi\": \"3.0.3\","
-"\"info\": {"
-"\"title\": \"PG Analytics Collector API\","
-"\"description\": \"API para coleta de metricas PostgreSQL em tempo real\","
-"\"version\": \"1.0.0\""
-"},"
-"\"servers\": [{\"url\": \"http://localhost:8080\"}],"
-"\"paths\": {"
-"\"/\": {"
-"\"get\": {"
-"\"summary\": \"Root endpoint\","
-"\"responses\": {\"200\": {\"description\": \"OK\"}}"
-"}"
-"},"
-"\"/health\": {"
-"\"get\": {"
-"\"summary\": \"Health check\","
-"\"responses\": {\"200\": {\"description\": \"Health status\"}}"
-"}"
-"},"
-"\"/metrics\": {"
-"\"get\": {"
-"\"summary\": \"Prometheus metrics\","
-"\"responses\": {\"200\": {\"description\": \"Metrics data\"}}"
-"}"
-"}"
-"}"
-"}";
+volatile sig_atomic_t keep_running = 1;
 
-// Swagger UI HTML content
-const char* swagger_html = 
-"<!DOCTYPE html>"
-"<html><head><title>PG Analytics API</title>"
-"<link rel=\"stylesheet\" href=\"https://unpkg.com/swagger-ui-dist@3.52.5/swagger-ui.css\"/>"
-"</head><body>"
-"<div id=\"swagger-ui\"></div>"
-"<script src=\"https://unpkg.com/swagger-ui-dist@3.52.5/swagger-ui-bundle.js\"></script>"
-"<script>"
-"SwaggerUIBundle({"
-"url: '/openapi.json',"
-"dom_id: '#swagger-ui',"
-"presets: [SwaggerUIBundle.presets.apis]"
-"});"
-"</script></body></html>";
-
-void signal_handler(int sig) {
-    printf("\nShutting down collector...\n");
-    running = 0;
+void signal_handler(int signo) {
+    keep_running = 0;
+    global_metrics.running = 0;
 }
 
-int connect_database() {
-    char conninfo[512];
-    snprintf(conninfo, sizeof(conninfo), 
-             "host=%s port=%s dbname=%s user=%s password=%s connect_timeout=10",
-             db_host, db_port, db_name, db_user, db_password);
-    
-    printf("Connecting to database: host=%s port=%s dbname=%s user=%s\n", 
-           db_host, db_port, db_name, db_user);
-    
-    PGconn *conn = PQconnectdb(conninfo);
-    
-    if (PQstatus(conn) != CONNECTION_OK) {
-        printf("Database connection failed: %s\n", PQerrorMessage(conn));
-        PQfinish(conn);
-        return 0;
-    }
-    
-    printf("Connected to PostgreSQL successfully!\n");
-    PQfinish(conn);
-    return 1;
-}
-
-void update_metrics() {
-    char conninfo[512];
-    snprintf(conninfo, sizeof(conninfo), 
-             "host=%s port=%s dbname=%s user=%s password=%s connect_timeout=5",
-             db_host, db_port, db_name, db_user, db_password);
-    
-    PGconn *conn = PQconnectdb(conninfo);
-    
-    pthread_mutex_lock(&metrics_mutex);
-    
-    if (PQstatus(conn) == CONNECTION_OK) {
-        global_metrics.database_connected = 1;
-        
-        // Query for total connections
-        PGresult *res = PQexec(conn, "SELECT count(*) FROM pg_stat_activity;");
-        if (PQresultStatus(res) == PGRES_TUPLES_OK && PQntuples(res) > 0) {
-            global_metrics.total_connections = atoi(PQgetvalue(res, 0, 0));
-        }
-        PQclear(res);
-        
-        // Query for active connections
-        res = PQexec(conn, "SELECT count(*) FROM pg_stat_activity WHERE state = 'active';");
-        if (PQresultStatus(res) == PGRES_TUPLES_OK && PQntuples(res) > 0) {
-            global_metrics.active_connections = atoi(PQgetvalue(res, 0, 0));
-        }
-        PQclear(res);
-        
-        // Cache hit ratio
-        res = PQexec(conn, "SELECT ROUND((sum(heap_blks_hit) / (sum(heap_blks_hit) + sum(heap_blks_read) + 1))::numeric, 4) FROM pg_statio_user_tables;");
-        if (PQresultStatus(res) == PGRES_TUPLES_OK && PQntuples(res) > 0) {
-            const char* ratio_str = PQgetvalue(res, 0, 0);
-            if (ratio_str && strlen(ratio_str) > 0) {
-                global_metrics.cache_hit_ratio = atof(ratio_str);
-            } else {
-                global_metrics.cache_hit_ratio = 0.98;
-            }
-        }
-        PQclear(res);
-        
-        global_metrics.last_update = time(NULL);
-        printf("Metrics updated: %d total, %d active connections\n", 
-               global_metrics.total_connections, global_metrics.active_connections);
-    } else {
-        global_metrics.database_connected = 0;
-        printf("Database connection failed: %s\n", PQerrorMessage(conn));
-    }
-    
-    pthread_mutex_unlock(&metrics_mutex);
-    
-    if (conn) {
-        PQfinish(conn);
-    }
-}
-
-void* metrics_collector_thread(void* arg) {
-    printf("Metrics collector thread started\n");
-    
-    while (running) {
-        update_metrics();
-        
-        for (int i = 0; i < 30 && running; i++) {
-            sleep(1);
-        }
-    }
-    
-    printf("Metrics collector thread stopped\n");
-    return NULL;
-}
-
-void send_response(int socket, const char* status, const char* content_type, const char* body) {
-    char response[BUFFER_SIZE * 2];
-    int body_length = body ? strlen(body) : 0;
-    
+void send_response(int client_socket, const char* status, const char* content_type, const char* body) {
+    char response[BUFFER_SIZE];
     snprintf(response, sizeof(response),
         "HTTP/1.1 %s\r\n"
         "Content-Type: %s\r\n"
-        "Content-Length: %d\r\n"
-        "Access-Control-Allow-Origin: *\r\n"
-        "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n"
-        "Access-Control-Allow-Headers: Content-Type\r\n"
+        "Content-Length: %lu\r\n"
         "Connection: close\r\n"
-        "\r\n"
-        "%s",
-        status, content_type, body_length, body ? body : "");
-    
-    send(socket, response, strlen(response), 0);
+        "\r\n%s",
+        status, content_type, strlen(body), body);
+    send(client_socket, response, strlen(response), 0);
 }
 
-void send_file_response(int socket, const char* content_type, const char* content) {
-    send_response(socket, "200 OK", content_type, content);
+PGconn* connect_to_database(const char* conn_string) {
+    PGconn *conn = PQconnectdb(conn_string);
+    if (PQstatus(conn) != CONNECTION_OK) {
+        PQfinish(conn);
+        return NULL;
+    }
+    return conn;
+}
+
+void discover_tenants() {
+    char conn_string[512];
+    snprintf(conn_string, sizeof(conn_string),
+        "host=%s port=%s dbname=%s user=%s password=%s",
+        db_host, db_port, db_name, db_user, db_password);
+    
+    PGconn *conn = connect_to_database(conn_string);
+    if (!conn) return;
+    
+    PGresult *res = PQexec(conn, "SELECT datname FROM pg_database WHERE datistemplate = false");
+    
+    if (PQresultStatus(res) == PGRES_TUPLES_OK) {
+        pthread_mutex_lock(&global_metrics.mutex);
+        global_metrics.tenant_count = 0;
+        
+        int rows = PQntuples(res);
+        for (int i = 0; i < rows && i < MAX_TENANTS; i++) {
+            char *dbname = PQgetvalue(res, i, 0);
+            tenant_metrics_t *tenant = &global_metrics.tenants[global_metrics.tenant_count];
+            
+            strncpy(tenant->tenant_id, dbname, sizeof(tenant->tenant_id) - 1);
+            strncpy(tenant->db_name, dbname, sizeof(tenant->db_name) - 1);
+            snprintf(tenant->conn_string, sizeof(tenant->conn_string),
+                "host=%s port=%s dbname=%s user=%s password=%s",
+                db_host, db_port, dbname, db_user, db_password);
+            
+            tenant->active = 1;
+            global_metrics.tenant_count++;
+        }
+        pthread_mutex_unlock(&global_metrics.mutex);
+    }
+    
+    PQclear(res);
+    PQfinish(conn);
+}
+
+void update_tenant_metrics(tenant_metrics_t *tenant) {
+    PGconn *conn = connect_to_database(tenant->conn_string);
+    if (!conn) {
+        tenant->database_connected = 0;
+        return;
+    }
+    
+    tenant->database_connected = 1;
+    
+    PGresult *res = PQexec(conn, 
+        "SELECT COUNT(*), COUNT(*) FILTER (WHERE state = 'active') "
+        "FROM pg_stat_activity WHERE datname = current_database()");
+    
+    if (PQresultStatus(res) == PGRES_TUPLES_OK && PQntuples(res) > 0) {
+        tenant->total_connections = atol(PQgetvalue(res, 0, 0));
+        tenant->active_connections = atol(PQgetvalue(res, 0, 1));
+    }
+    PQclear(res);
+    
+    res = PQexec(conn,
+        "SELECT CASE WHEN sum(heap_blks_hit + heap_blks_read) = 0 THEN 0 "
+        "ELSE round(sum(heap_blks_hit) * 100.0 / sum(heap_blks_hit + heap_blks_read), 2) END "
+        "FROM pg_statio_user_tables");
+    
+    if (PQresultStatus(res) == PGRES_TUPLES_OK && PQntuples(res) > 0) {
+        tenant->cache_hit_ratio = atof(PQgetvalue(res, 0, 0));
+    }
+    PQclear(res);
+    
+    res = PQexec(conn, "SELECT pg_database_size(current_database())");
+    if (PQresultStatus(res) == PGRES_TUPLES_OK && PQntuples(res) > 0) {
+        tenant->database_size = atol(PQgetvalue(res, 0, 0));
+    }
+    PQclear(res);
+    
+    tenant->last_update = time(NULL);
+    PQfinish(conn);
+}
+
+void* metrics_collector_thread(void* arg) {
+    while (global_metrics.running) {
+        discover_tenants();
+        
+        pthread_mutex_lock(&global_metrics.mutex);
+        for (int i = 0; i < global_metrics.tenant_count; i++) {
+            if (global_metrics.tenants[i].active) {
+                update_tenant_metrics(&global_metrics.tenants[i]);
+            }
+        }
+        global_metrics.last_global_update = time(NULL);
+        pthread_mutex_unlock(&global_metrics.mutex);
+        
+        sleep(30);
+    }
+    return NULL;
+}
+
+void handle_metrics_request(int client_socket) {
+    char response_body[BUFFER_SIZE * 4] = {0};
+    char temp[512];
+    
+    strcat(response_body, "# Multi-tenant PostgreSQL metrics\n");
+    strcat(response_body, "pganalytics_info{version=\"1.0\"} 1\n\n");
+    
+    pthread_mutex_lock(&global_metrics.mutex);
+    
+    for (int i = 0; i < global_metrics.tenant_count; i++) {
+        tenant_metrics_t *tenant = &global_metrics.tenants[i];
+        if (!tenant->active) continue;
+        
+        snprintf(temp, sizeof(temp), 
+            "pganalytics_total_connections{tenant=\"%s\"} %ld\n",
+            tenant->tenant_id, tenant->total_connections);
+        strcat(response_body, temp);
+        
+        snprintf(temp, sizeof(temp), 
+            "pganalytics_active_connections{tenant=\"%s\"} %ld\n",
+            tenant->tenant_id, tenant->active_connections);
+        strcat(response_body, temp);
+        
+        snprintf(temp, sizeof(temp),
+            "pganalytics_cache_hit_ratio{tenant=\"%s\"} %.2f\n",
+            tenant->tenant_id, tenant->cache_hit_ratio);
+        strcat(response_body, temp);
+        
+        snprintf(temp, sizeof(temp),
+            "pganalytics_database_size_bytes{tenant=\"%s\"} %ld\n",
+            tenant->tenant_id, tenant->database_size);
+        strcat(response_body, temp);
+        
+        snprintf(temp, sizeof(temp),
+            "pganalytics_database_connected{tenant=\"%s\"} %d\n",
+            tenant->tenant_id, tenant->database_connected);
+        strcat(response_body, temp);
+    }
+    
+    pthread_mutex_unlock(&global_metrics.mutex);
+    
+    send_response(client_socket, "200 OK", "text/plain", response_body);
+}
+
+void handle_health_request(int client_socket) {
+    char response_body[1024];
+    time_t now = time(NULL);
+    
+    pthread_mutex_lock(&global_metrics.mutex);
+    int connected_tenants = 0;
+    for (int i = 0; i < global_metrics.tenant_count; i++) {
+        if (global_metrics.tenants[i].database_connected) {
+            connected_tenants++;
+        }
+    }
+    
+    const char* status = connected_tenants > 0 ? "healthy" : "unhealthy";
+    
+    snprintf(response_body, sizeof(response_body),
+        "{\"status\": \"%s\", \"tenants\": %d, \"connected\": %d, \"timestamp\": %ld}",
+        status, global_metrics.tenant_count, connected_tenants, now);
+    
+    pthread_mutex_unlock(&global_metrics.mutex);
+    
+    send_response(client_socket, "200 OK", "application/json", response_body);
 }
 
 void handle_request(int client_socket) {
     char buffer[BUFFER_SIZE];
-    int bytes_received = recv(client_socket, buffer, BUFFER_SIZE - 1, 0);
+    ssize_t bytes_received = recv(client_socket, buffer, sizeof(buffer) - 1, 0);
     
-    if (bytes_received < 0) {
-        printf("Error receiving request\n");
-        close(client_socket);
-        return;
+    if (bytes_received > 0) {
+        buffer[bytes_received] = '\0';
+        
+        if (strstr(buffer, "GET /metrics")) {
+            handle_metrics_request(client_socket);
+        } else if (strstr(buffer, "GET /health")) {
+            handle_health_request(client_socket);
+        } else {
+            const char* body = "{\"service\": \"pganalytics-c-collector\"}";
+            send_response(client_socket, "200 OK", "application/json", body);
+        }
     }
-    
-    buffer[bytes_received] = '\0';
-    
-    char method[16], path[256];
-    sscanf(buffer, "%s %s", method, path);
-    
-    printf("Request: %s %s\n", method, path);
-    
-    if (strcmp(path, "/") == 0) {
-        const char* response_body = 
-            "{\"service\": \"pg-analytics-collector\", "
-            "\"version\": \"1.0.0\", "
-            "\"status\": \"running\", "
-            "\"timestamp\": \"";
-        
-        char full_response[512];
-        time_t now = time(NULL);
-        snprintf(full_response, sizeof(full_response), 
-                "%s%ld\"}", response_body, now);
-        
-        send_response(client_socket, "200 OK", "application/json", full_response);
-        
-    } else if (strcmp(path, "/health") == 0) {
-        pthread_mutex_lock(&metrics_mutex);
-        
-        char health_response[1024];
-        time_t now = time(NULL);
-        int data_age = (int)(now - global_metrics.last_update);
-        
-        snprintf(health_response, sizeof(health_response),
-            "{"
-            "\"status\": \"healthy\", "
-            "\"timestamp\": %ld, "
-            "\"database_connected\": %s, "
-            "\"last_update\": %ld, "
-            "\"data_age_seconds\": %d, "
-            "\"version\": \"1.0\", "
-            "\"type\": \"c-bypass\", "
-            "\"metrics\": {"
-            "\"total_connections\": %d, "
-            "\"active_connections\": %d, "
-            "\"cache_hit_ratio\": %.4f"
-            "}"
-            "}",
-            now,
-            global_metrics.database_connected ? "true" : "false",
-            global_metrics.last_update,
-            data_age,
-            global_metrics.total_connections,
-            global_metrics.active_connections,
-            global_metrics.cache_hit_ratio
-        );
-        
-        pthread_mutex_unlock(&metrics_mutex);
-        
-        send_response(client_socket, "200 OK", "application/json", health_response);
-        
-    } else if (strcmp(path, "/metrics") == 0) {
-        pthread_mutex_lock(&metrics_mutex);
-        
-        char metrics_response[2048];
-        time_t now = time(NULL);
-        
-        snprintf(metrics_response, sizeof(metrics_response),
-            "# HELP pganalytics_collector_info Information about the collector\n"
-            "# TYPE pganalytics_collector_info gauge\n"
-            "pganalytics_collector_info{version=\"1.0\",type=\"c-bypass\"} 1\n"
-            "\n"
-            "# HELP pganalytics_database_connected Database connection status\n"
-            "# TYPE pganalytics_database_connected gauge\n"
-            "pganalytics_database_connected %d\n"
-            "\n"
-            "# HELP pganalytics_total_connections Total database connections\n"
-            "# TYPE pganalytics_total_connections gauge\n"
-            "pganalytics_total_connections %d\n"
-            "\n"
-            "# HELP pganalytics_active_connections Active database connections\n"
-            "# TYPE pganalytics_active_connections gauge\n"
-            "pganalytics_active_connections %d\n"
-            "\n"
-            "# HELP pganalytics_cache_hit_ratio Database cache hit ratio\n"
-            "# TYPE pganalytics_cache_hit_ratio gauge\n"
-            "pganalytics_cache_hit_ratio %.4f\n"
-            "\n"
-            "# HELP pganalytics_last_update Last metrics update timestamp\n"
-            "# TYPE pganalytics_last_update gauge\n"
-            "pganalytics_last_update %ld\n",
-            global_metrics.database_connected,
-            global_metrics.total_connections,
-            global_metrics.active_connections,
-            global_metrics.cache_hit_ratio,
-            global_metrics.last_update
-        );
-        
-        pthread_mutex_unlock(&metrics_mutex);
-        
-        send_response(client_socket, "200 OK", "text/plain; version=0.0.4; charset=utf-8", metrics_response);
-        
-    } else if (strcmp(path, "/swagger") == 0 || strcmp(path, "/docs") == 0) {
-        send_file_response(client_socket, "text/html; charset=utf-8", swagger_html);
-        
-    } else if (strcmp(path, "/openapi.json") == 0) {
-        send_file_response(client_socket, "application/json", openapi_json);
-        
-    } else {
-        const char* not_found_body = "{\"error\": \"Not Found\", \"path\": \"";
-        char error_response[512];
-        snprintf(error_response, sizeof(error_response), "%s%s\"}", not_found_body, path);
-        
-        send_response(client_socket, "404 Not Found", "application/json", error_response);
-    }
-    
-    close(client_socket);
 }
 
 int main() {
-    printf("PG Analytics C Collector v1.0 starting...\n");
+    char *env_host = getenv("DB_HOST");
+    char *env_port = getenv("DB_PORT");
+    char *env_name = getenv("DB_NAME");
+    char *env_user = getenv("DB_USER");
+    char *env_password = getenv("DB_PASSWORD");
+    
+    if (env_host) db_host = env_host;
+    if (env_port) db_port = env_port;
+    if (env_name) db_name = env_name;
+    if (env_user) db_user = env_user;
+    if (env_password) db_password = env_password;
+    
+    printf("Starting multi-tenant C collector...\n");
+    printf("Database: %s:%s/%s\n", db_host, db_port, db_name);
     
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
     
-    printf("Testing database connection...\n");
-    if (!connect_database()) {
-        printf("Warning: Database connection failed, continuing anyway\n");
-    }
+    pthread_mutex_init(&global_metrics.mutex, NULL);
+    global_metrics.running = 1;
     
-    update_metrics();
+    discover_tenants();
     
     pthread_t metrics_thread;
-    if (pthread_create(&metrics_thread, NULL, metrics_collector_thread, NULL) != 0) {
-        printf("Failed to create metrics thread: %s\n", strerror(errno));
-        return 1;
-    }
+    pthread_create(&metrics_thread, NULL, metrics_collector_thread, NULL);
     
     int server_socket = socket(AF_INET, SOCK_STREAM, 0);
-    if (server_socket < 0) {
-        printf("Error creating socket\n");
-        return 1;
-    }
-    
     int opt = 1;
-    if (setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
-        printf("Warning: setsockopt failed\n");
-    }
+    setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
     
     struct sockaddr_in server_addr;
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = INADDR_ANY;
     server_addr.sin_port = htons(PORT);
     
-    if (bind(server_socket, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
-        printf("Error binding socket: %s\n", strerror(errno));
-        close(server_socket);
-        return 1;
-    }
+    bind(server_socket, (struct sockaddr*)&server_addr, sizeof(server_addr));
+    listen(server_socket, 10);
     
-    if (listen(server_socket, MAX_CONNECTIONS) < 0) {
-        printf("Error listening: %s\n", strerror(errno));
-        close(server_socket);
-        return 1;
-    }
+    printf("Collector listening on port %d\n", PORT);
     
-    printf("C Collector server listening on port %d\n", PORT);
-    printf("Available endpoints:\n");
-    printf("  GET /          - Service info\n");
-    printf("  GET /health    - Health check\n");
-    printf("  GET /metrics   - Prometheus metrics\n");
-    printf("  GET /swagger   - API documentation\n");
-    printf("  GET /docs      - API documentation (alias)\n");
-    printf("  GET /openapi.json - OpenAPI specification\n");
-    
-    while (running) {
+    while (keep_running) {
         struct sockaddr_in client_addr;
         socklen_t client_len = sizeof(client_addr);
         
         int client_socket = accept(server_socket, (struct sockaddr*)&client_addr, &client_len);
-        if (client_socket < 0) {
-            if (running) {
-                printf("Error accepting connection: %s\n", strerror(errno));
-            }
-            continue;
+        if (client_socket != -1) {
+            handle_request(client_socket);
+            close(client_socket);
         }
-        
-        handle_request(client_socket);
     }
     
-    printf("Shutting down server...\n");
+    global_metrics.running = 0;
+    pthread_join(metrics_thread, NULL);
+    pthread_mutex_destroy(&global_metrics.mutex);
     close(server_socket);
     
-    printf("Waiting for metrics thread...\n");
-    pthread_join(metrics_thread, NULL);
-    
-    printf("Server stopped\n");
     return 0;
 }
