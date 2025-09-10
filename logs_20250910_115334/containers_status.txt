@@ -1,3 +1,0 @@
-NAME                             IMAGE                            COMMAND                  SERVICE              CREATED              STATUS                        PORTS
-pganalytics-c-bypass-collector   pganalytics-c-bypass-collector   "./collector"            c-bypass-collector   About a minute ago   Up About a minute (healthy)   0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp
-pganalytics-postgres             postgres:15-alpine               "docker-entrypoint.s…"   postgres             About a minute ago   Up About a minute (healthy)   0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp

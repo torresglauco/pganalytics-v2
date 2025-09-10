@@ -1,1 +1,0 @@
-Docker Compose version 2.39.2

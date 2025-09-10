@@ -1,124 +1,75 @@
-# 🏆 PG Analytics v2 - Enterprise Makefile
-# ========================================
+# PGAnalytics v2 Makefile
 
-.PHONY: help build run test clean
+.PHONY: help setup build start stop restart status logs clean validate
 
-APP_NAME=pganalytics
-VERSION=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
-BUILD_TIME=$(shell date -u '+%Y-%m-%d_%H:%M:%S')
+# Cores para output
+GREEN=\033[0;32m
+YELLOW=\033[1;33m
+RED=\033[0;31m
+NC=\033[0m # No Color
 
-help: ## 📋 Mostrar ajuda
-	@echo "🏆 PG Analytics v2 - Comandos Enterprise"
-	@echo "========================================"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'
+help: ## Mostrar esta ajuda
+	@echo "$(GREEN)PGAnalytics v2 - Comandos Disponíveis$(NC)"
+	@echo "======================================"
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "$(YELLOW)%-15s$(NC) %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-# 🔨 BUILD E EXECUÇÃO
-build: ## 🔨 Build da aplicação
-	@echo "🔨 Building $(APP_NAME) v$(VERSION)..."
-	go build -ldflags "-X main.version=$(VERSION) -X main.buildTime=$(BUILD_TIME)" -o bin/$(APP_NAME) main.go
+setup: ## Configuração inicial completa
+	@echo "$(GREEN)Executando setup completo...$(NC)"
+	@bash scripts/setup_final.sh
 
-run: ## 🚀 Executar aplicação
-	@echo "🚀 Iniciando $(APP_NAME)..."
-	go run main.go
+setup-clean: ## Setup com limpeza de volumes
+	@echo "$(GREEN)Executando setup com limpeza...$(NC)"
+	@bash scripts/setup_final.sh --clean
 
-dev: ## 🛠️ Desenvolvimento com live reload
-	@echo "🛠️  Modo desenvolvimento..."
-	air
+build: ## Build de todos os containers
+	@echo "$(GREEN)Building containers...$(NC)"
+	@docker-compose -f docker-compose-complete.yml build
 
-# 🧪 TESTES
-test: ## 🧪 Testes unitários
-	@echo "🧪 Executando testes..."
-	go test -v ./...
+start: ## Iniciar todos os serviços
+	@echo "$(GREEN)Iniciando serviços...$(NC)"
+	@docker-compose -f docker-compose-complete.yml up -d
 
-test-api: ## 🌐 Testes de API
-	@echo "🌐 Testando API..."
-	chmod +x tests/test_api.sh && ./tests/test_api.sh
+stop: ## Parar todos os serviços
+	@echo "$(YELLOW)Parando serviços...$(NC)"
+	@docker-compose -f docker-compose-complete.yml down
 
-test-all: ## 🎯 Todos os testes
-	@echo "🎯 Executando todos os testes..."
-	make test && make test-api
+restart: ## Reiniciar todos os serviços
+	@echo "$(YELLOW)Reiniciando serviços...$(NC)"
+	@docker-compose -f docker-compose-complete.yml restart
 
-# 🐳 DOCKER COMPOSE - SETUPS
-compose-bypass: ## 🔄 Setup bypass (recomendado)
-	@echo "🔄 Iniciando setup bypass..."
-	docker-compose -f docker/compose/bypass.yml up -d
+status: ## Ver status dos containers
+	@echo "$(GREEN)Status dos containers:$(NC)"
+	@docker-compose -f docker-compose-complete.yml ps
 
-compose-monitoring: ## 📊 Setup monitoramento completo
-	@echo "📊 Iniciando monitoramento..."
-	docker-compose -f docker/compose/monitoring.yml up -d
+logs: ## Ver logs de todos os serviços
+	@echo "$(GREEN)Logs dos serviços:$(NC)"
+	@docker-compose -f docker-compose-complete.yml logs --tail=50
 
-compose-otel: ## 🔍 Setup OpenTelemetry
-	@echo "🔍 Iniciando OpenTelemetry..."
-	docker-compose -f docker/compose/otel.yml up -d
+validate: ## Executar validação completa
+	@echo "$(GREEN)Executando validação...$(NC)"
+	@bash scripts/validate_complete_stack.sh
 
-compose-prod: ## 🚀 Setup produção
-	@echo "🚀 Iniciando produção..."
-	docker-compose -f docker/compose/production.yml up -d
+clean: ## Limpar containers e volumes
+	@echo "$(RED)Limpando containers e volumes...$(NC)"
+	@docker-compose -f docker-compose-complete.yml down -v
+	@docker system prune -f
 
-compose-down: ## ⏹️ Parar todos os serviços
-	@echo "⏹️  Parando serviços..."
-	@for file in docker/compose/*.yml; do docker-compose -f "$$file" down 2>/dev/null || true; done
-	@docker-compose down 2>/dev/null || true
+metrics: ## Ver métricas do C Collector
+	@echo "$(GREEN)Métricas do C Collector:$(NC)"
+	@curl -s http://localhost:8080/metrics | head -20
 
-# 🛠️ UTILITÁRIOS
-status: ## 📊 Status do sistema
-	@./scripts/system_status.sh
+health: ## Verificar saúde de todos os serviços
+	@echo "$(GREEN)Health check:$(NC)"
+	@echo "C Collector: $$(curl -s -o /dev/null -w "%%{http_code}" http://localhost:8080/health)"
+	@echo "Go Backend:  $$(curl -s -o /dev/null -w "%%{http_code}" http://localhost:8081/health)"
+	@echo "Prometheus:  $$(curl -s -o /dev/null -w "%%{http_code}" http://localhost:9090/-/healthy)"
+	@echo "Grafana:     $$(curl -s -o /dev/null -w "%%{http_code}" http://localhost:3000/api/health)"
 
-security-check: ## 🔒 Verificação de segurança
-	@./scripts/security_check.sh
-
-setup: ## ⚙️ Setup inicial
-	@./scripts/setup.sh
-
-logs: ## 📝 Ver logs
-	@docker-compose logs -f
-
-# 🧹 LIMPEZA
-clean: ## 🧹 Limpeza básica
-	@echo "🧹 Limpando arquivos temporários..."
-	@rm -rf bin/ tmp/ *.log coverage.out air_tmp/
-
-clean-docker: ## 🐳 Limpeza Docker completa
-	@echo "🐳 Limpeza Docker completa..."
-	@make compose-down
-	@docker system prune -af
-	@docker volume prune -f
-
-# 📚 DOCUMENTAÇÃO
-docs: ## 📚 Gerar documentação
-	@echo "📚 Gerando documentação..."
-	@command -v swag >/dev/null && swag init -g main.go || echo "⚠️  swag não instalado"
-
-# 📈 MÉTRICAS E MONITORAMENTO
-metrics: ## 📈 Ver métricas
-	@echo "📈 Métricas atuais:"
-	@curl -s http://localhost:8080/metrics | head -20 || echo "❌ Serviço não disponível"
-
-health: ## 🏥 Health check
-	@echo "🏥 Verificando saúde dos serviços..."
-	@curl -s http://localhost:8080/health || echo "❌ API offline"
-	@curl -s http://localhost:9090/-/ready || echo "❌ Prometheus offline"
-	@curl -s http://localhost:3000/api/health || echo "❌ Grafana offline"
-
-# 🔮 VERSÃO E INFO
-version: ## 📋 Mostrar versão
-	@echo "🏆 $(APP_NAME) v$(VERSION)"
-	@echo "📅 Build: $(BUILD_TIME)"
-	@echo "🐹 Go: $(shell go version)"
-
-info: ## ℹ️ Informações do projeto
-	@echo "🏆 PG Analytics v2 - Sistema Enterprise de Monitoramento PostgreSQL"
-	@echo "=============================================================="
-	@echo "📊 Componentes:"
-	@echo "  • API Go com JWT"
-	@echo "  • Coletor C OpenTelemetry"
-	@echo "  • Prometheus + Grafana"
-	@echo "  • PostgreSQL Analytics"
-	@echo ""
-	@echo "🌐 Endpoints:"
-	@echo "  • API: http://localhost:8080"
-	@echo "  • Swagger: http://localhost:8080/swagger/"
-	@echo "  • Grafana: http://localhost:3000 (admin/admin)"
-	@echo "  • Prometheus: http://localhost:9090"
-
-.DEFAULT_GOAL := help
+info: ## Mostrar informações do ambiente
+	@echo "$(GREEN)PGAnalytics v2 - Informações do Ambiente$(NC)"
+	@echo "=========================================="
+	@echo "📊 Grafana:              http://localhost:3000"
+	@echo "📈 Prometheus:           http://localhost:9090"
+	@echo "🔧 C Collector:          http://localhost:8080/metrics"
+	@echo "🖥️  Go Backend:           http://localhost:8081/health"
+	@echo "🗄️  PostgreSQL:           localhost:5432"

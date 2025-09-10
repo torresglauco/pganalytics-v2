@@ -1,6 +1,0 @@
-time="2025-09-10T14:32:24-03:00" level=warning msg="/Users/glauco.torres/git/pganalytics-v2/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
-NAME                             IMAGE                               COMMAND                  SERVICE              CREATED          STATUS                             PORTS
-pganalytics-c-bypass-collector   pganalytics-v2-c-bypass-collector   "./collector"            c-bypass-collector   48 seconds ago   Up 47 seconds (health: starting)   0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp
-pganalytics-postgres             postgres:15                         "docker-entrypoint.s…"   postgres             48 seconds ago   Up 47 seconds (healthy)            0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp
-pganalytics-v2-grafana-1         grafana/grafana:latest              "/run.sh"                grafana              48 seconds ago   Up 47 seconds                      0.0.0.0:3000->3000/tcp, [::]:3000->3000/tcp
-pganalytics-v2-prometheus-1      prom/prometheus:latest              "/bin/prometheus --c…"   prometheus           48 seconds ago   Up 47 seconds                      0.0.0.0:9090->9090/tcp, [::]:9090->9090/tcp
