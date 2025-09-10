@@ -1,51 +1,75 @@
-.PHONY: test test-unit test-integration build clean lint
+# PGAnalytics v2 Makefile
 
-# Go parameters
-GOCMD=go
-GOBUILD=$(GOCMD) build
-GOCLEAN=$(GOCMD) clean
-GOTEST=$(GOCMD) test
-GOGET=$(GOCMD) get
-GOMOD=$(GOCMD) mod
-BINARY_NAME=pganalytics-v2
+.PHONY: help setup build start stop restart status logs clean validate
 
-# Build the application
-build:
-	$(GOBUILD) -o $(BINARY_NAME) -v ./cmd/server
+# Cores para output
+GREEN=\033[0;32m
+YELLOW=\033[1;33m
+RED=\033[0;31m
+NC=\033[0m # No Color
 
-# Run all tests
-test: test-unit test-integration
+help: ## Mostrar esta ajuda
+	@echo "$(GREEN)PGAnalytics v2 - Comandos Disponíveis$(NC)"
+	@echo "======================================"
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "$(YELLOW)%-15s$(NC) %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-# Run unit tests
-test-unit:
-	$(GOTEST) -v ./tests/unit/...
+setup: ## Configuração inicial completa
+	@echo "$(GREEN)Executando setup completo...$(NC)"
+	@bash scripts/setup_final.sh
 
-# Run integration tests
-test-integration:
-	$(GOTEST) -v ./tests/integration/...
+setup-clean: ## Setup com limpeza de volumes
+	@echo "$(GREEN)Executando setup com limpeza...$(NC)"
+	@bash scripts/setup_final.sh --clean
 
-# Clean build artifacts
-clean:
-	$(GOCLEAN)
-	rm -f $(BINARY_NAME)
+build: ## Build de todos os containers
+	@echo "$(GREEN)Building containers...$(NC)"
+	@docker-compose -f docker-compose-complete.yml build
 
-# Download dependencies
-deps:
-	$(GOMOD) download
-	$(GOMOD) tidy
+start: ## Iniciar todos os serviços
+	@echo "$(GREEN)Iniciando serviços...$(NC)"
+	@docker-compose -f docker-compose-complete.yml up -d
 
-# Lint code
-lint:
-	golangci-lint run
+stop: ## Parar todos os serviços
+	@echo "$(YELLOW)Parando serviços...$(NC)"
+	@docker-compose -f docker-compose-complete.yml down
 
-# Run in development
-dev:
-	$(GOCMD) run ./cmd/server
+restart: ## Reiniciar todos os serviços
+	@echo "$(YELLOW)Reiniciando serviços...$(NC)"
+	@docker-compose -f docker-compose-complete.yml restart
 
-# Docker build
-docker-build:
-	docker build -t pganalytics-v2 .
+status: ## Ver status dos containers
+	@echo "$(GREEN)Status dos containers:$(NC)"
+	@docker-compose -f docker-compose-complete.yml ps
 
-# Docker run
-docker-run:
-	docker-compose up -d
+logs: ## Ver logs de todos os serviços
+	@echo "$(GREEN)Logs dos serviços:$(NC)"
+	@docker-compose -f docker-compose-complete.yml logs --tail=50
+
+validate: ## Executar validação completa
+	@echo "$(GREEN)Executando validação...$(NC)"
+	@bash scripts/validate_complete_stack.sh
+
+clean: ## Limpar containers e volumes
+	@echo "$(RED)Limpando containers e volumes...$(NC)"
+	@docker-compose -f docker-compose-complete.yml down -v
+	@docker system prune -f
+
+metrics: ## Ver métricas do C Collector
+	@echo "$(GREEN)Métricas do C Collector:$(NC)"
+	@curl -s http://localhost:8080/metrics | head -20
+
+health: ## Verificar saúde de todos os serviços
+	@echo "$(GREEN)Health check:$(NC)"
+	@echo "C Collector: $$(curl -s -o /dev/null -w "%%{http_code}" http://localhost:8080/health)"
+	@echo "Go Backend:  $$(curl -s -o /dev/null -w "%%{http_code}" http://localhost:8081/health)"
+	@echo "Prometheus:  $$(curl -s -o /dev/null -w "%%{http_code}" http://localhost:9090/-/healthy)"
+	@echo "Grafana:     $$(curl -s -o /dev/null -w "%%{http_code}" http://localhost:3000/api/health)"
+
+info: ## Mostrar informações do ambiente
+	@echo "$(GREEN)PGAnalytics v2 - Informações do Ambiente$(NC)"
+	@echo "=========================================="
+	@echo "📊 Grafana:              http://localhost:3000"
+	@echo "📈 Prometheus:           http://localhost:9090"
+	@echo "🔧 C Collector:          http://localhost:8080/metrics"
+	@echo "🖥️  Go Backend:           http://localhost:8081/health"
+	@echo "🗄️  PostgreSQL:           localhost:5432"
