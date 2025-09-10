@@ -1,0 +1,61 @@
+# HELP pganalytics_collector_info Collector information
+# TYPE pganalytics_collector_info gauge
+pganalytics_collector_info{version="2.0.0-enhanced",service="c-collector"} 1
+
+# HELP pganalytics_total_connections Total connections
+# TYPE pganalytics_total_connections gauge
+# HELP pganalytics_active_connections Active connections
+# TYPE pganalytics_active_connections gauge
+# HELP pganalytics_idle_connections Idle connections
+# TYPE pganalytics_idle_connections gauge
+# HELP pganalytics_idle_in_transaction_connections Idle in transaction connections
+# TYPE pganalytics_idle_in_transaction_connections gauge
+# HELP pganalytics_max_connections Maximum connections
+# TYPE pganalytics_max_connections gauge
+# HELP pganalytics_cache_hit_ratio Cache hit ratio
+# TYPE pganalytics_cache_hit_ratio gauge
+# HELP pganalytics_database_size_bytes Database size in bytes
+# TYPE pganalytics_database_size_bytes gauge
+# HELP pganalytics_locks_count Number of locks
+# TYPE pganalytics_locks_count gauge
+# HELP pganalytics_table_size_bytes Table size in bytes
+# TYPE pganalytics_table_size_bytes gauge
+# HELP pganalytics_index_size_bytes Index size in bytes
+# TYPE pganalytics_index_size_bytes gauge
+# HELP pganalytics_wal_files_count WAL files count
+# TYPE pganalytics_wal_files_count gauge
+# HELP pganalytics_slow_queries_count Slow queries count
+# TYPE pganalytics_slow_queries_count gauge
+# HELP pganalytics_is_primary Is primary server
+# TYPE pganalytics_is_primary gauge
+# HELP pganalytics_database_connected Database connection status
+# TYPE pganalytics_database_connected gauge
+
+pganalytics_total_connections{tenant="postgres"} 6
+pganalytics_active_connections{tenant="postgres"} 1
+pganalytics_idle_connections{tenant="postgres"} 0
+pganalytics_idle_in_transaction_connections{tenant="postgres"} 0
+pganalytics_max_connections{tenant="postgres"} 100
+pganalytics_cache_hit_ratio{tenant="postgres"} 99.41
+pganalytics_database_size_bytes{tenant="postgres"} 7664431
+pganalytics_locks_count{tenant="postgres"} 2
+pganalytics_table_size_bytes{tenant="postgres"} 2981888
+pganalytics_index_size_bytes{tenant="postgres"} 3096576
+pganalytics_wal_files_count{tenant="postgres"} 1
+pganalytics_slow_queries_count{tenant="postgres"} 0
+pganalytics_is_primary{tenant="postgres"} 1
+pganalytics_database_connected{tenant="postgres"} 1
+pganalytics_total_connections{tenant="pganalytics"} 6
+pganalytics_active_connections{tenant="pganalytics"} 1
+pganalytics_idle_connections{tenant="pganalytics"} 0
+pganalytics_idle_in_transaction_connections{tenant="pganalytics"} 0
+pganalytics_max_connections{tenant="pganalytics"} 100
+pganalytics_cache_hit_ratio{tenant="pganalytics"} 99.55
+pganalytics_database_size_bytes{tenant="pganalytics"} 7721775
+pganalytics_locks_count{tenant="pganalytics"} 2
+pganalytics_table_size_bytes{tenant="pganalytics"} 3014656
+pganalytics_index_size_bytes{tenant="pganalytics"} 3112960
+pganalytics_wal_files_count{tenant="pganalytics"} 1
+pganalytics_slow_queries_count{tenant="pganalytics"} 0
+pganalytics_is_primary{tenant="pganalytics"} 1
+pganalytics_database_connected{tenant="pganalytics"} 1
