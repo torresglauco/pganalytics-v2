@@ -1,0 +1,30 @@
+# HELP pg_up PostgreSQL server is up
+# TYPE pg_up gauge
+pg_up{tenant="postgres"} 1
+pg_connections_active{tenant="postgres"} 1
+pg_connections_idle{tenant="postgres"} 0
+pg_connections_max{tenant="postgres"} 100
+pg_cache_hit_ratio{tenant="postgres"} 99.75
+pg_database_size_bytes{tenant="postgres"} 7656239
+pg_locks_count{tenant="postgres"} 2
+pg_table_size_bytes{tenant="postgres"} 2973696
+pg_index_size_bytes{tenant="postgres"} 3096576
+pg_wal_files_count{tenant="postgres"} 1
+pg_slow_queries_count{tenant="postgres"} 0
+pg_query_duration_seconds{tenant="postgres"} 0.1
+pg_replication_lag_bytes{tenant="postgres"} 0
+pg_checkpoint_time_seconds{tenant="postgres"} 0.5
+pg_up{tenant="pganalytics"} 1
+pg_connections_active{tenant="pganalytics"} 1
+pg_connections_idle{tenant="pganalytics"} 0
+pg_connections_max{tenant="pganalytics"} 100
+pg_cache_hit_ratio{tenant="pganalytics"} 99.82
+pg_database_size_bytes{tenant="pganalytics"} 7656239
+pg_locks_count{tenant="pganalytics"} 2
+pg_table_size_bytes{tenant="pganalytics"} 2973696
+pg_index_size_bytes{tenant="pganalytics"} 3096576
+pg_wal_files_count{tenant="pganalytics"} 1
+pg_slow_queries_count{tenant="pganalytics"} 0
+pg_query_duration_seconds{tenant="pganalytics"} 0.1
+pg_replication_lag_bytes{tenant="pganalytics"} 0
+pg_checkpoint_time_seconds{tenant="pganalytics"} 0.5

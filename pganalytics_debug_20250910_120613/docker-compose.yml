@@ -1,0 +1,54 @@
+version: '3.8'
+
+networks:
+  pganalytics_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: pganalytics-postgres
+    environment:
+      POSTGRES_DB: pganalytics
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - pganalytics_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d pganalytics"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  c-bypass-collector:
+    build:
+      context: monitoring/c-collector
+      dockerfile: Dockerfile
+    container_name: pganalytics-c-bypass-collector
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: pganalytics
+      DB_USER: admin
+      DB_PASSWORD: admin123
+    ports:
+      - "8080:8080"
+    networks:
+      - pganalytics_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

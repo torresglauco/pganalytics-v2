@@ -1,0 +1,12 @@
+
+PostgreSQL Database directory appears to contain a database; Skipping initialization
+
+2025-09-10 14:51:59.348 UTC [1] LOG:  starting PostgreSQL 15.14 on aarch64-unknown-linux-musl, compiled by gcc (Alpine 14.2.0) 14.2.0, 64-bit
+2025-09-10 14:51:59.348 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2025-09-10 14:51:59.348 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+2025-09-10 14:51:59.349 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2025-09-10 14:51:59.350 UTC [30] LOG:  database system was shut down at 2025-09-10 14:51:40 UTC
+2025-09-10 14:51:59.352 UTC [1] LOG:  database system is ready to accept connections
+2025-09-10 14:56:59.368 UTC [28] LOG:  checkpoint starting: time
+2025-09-10 14:56:59.387 UTC [28] LOG:  checkpoint complete: wrote 3 buffers (0.0%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.005 s, sync=0.002 s, total=0.019 s; sync files=2, longest=0.001 s, average=0.001 s; distance=0 kB, estimate=0 kB
+2025-09-10 14:57:37.447 UTC [321] FATAL:  role "root" does not exist

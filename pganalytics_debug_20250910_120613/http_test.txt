@@ -1,0 +1,34 @@
+* Host localhost:8080 was resolved.
+* IPv6: ::1
+* IPv4: 127.0.0.1
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0*   Trying [::1]:8080...
+* Connected to localhost (::1) port 8080
+> GET /metrics HTTP/1.1
+> Host: localhost:8080
+> User-Agent: curl/8.7.1
+> Accept: */*
+> 
+* Request completely sent off
+< HTTP/1.1 200 OK
+< Content-Type: text/plain
+< Content-Length: 616
+< Connection: close
+< 
+{ [616 bytes data]
+100   616  100   616    0     0   231k      0 --:--:-- --:--:-- --:--:--  300k
+* Closing connection
+# Multi-tenant PostgreSQL metrics
+pganalytics_info{version="1.0"} 1
+
+pganalytics_total_connections{tenant="postgres"} 1
+pganalytics_active_connections{tenant="postgres"} 1
+pganalytics_cache_hit_ratio{tenant="postgres"} 0.00
+pganalytics_database_size_bytes{tenant="postgres"} 7656239
+pganalytics_database_connected{tenant="postgres"} 1
+pganalytics_total_connections{tenant="pganalytics"} 1
+pganalytics_active_connections{tenant="pganalytics"} 1
+pganalytics_cache_hit_ratio{tenant="pganalytics"} 0.00
+pganalytics_database_size_bytes{tenant="pganalytics"} 7656239
+pganalytics_database_connected{tenant="pganalytics"} 1

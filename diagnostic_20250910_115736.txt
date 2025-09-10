@@ -1,0 +1,173 @@
+[0;34m[11:57:36][0m Iniciando diagnóstico completo...
+
+=== 1. STATUS DOS CONTAINERS ===
+time="2025-09-10T11:57:36-03:00" level=warning msg="/Users/glauco.torres/git/pganalytics-v2/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+NAME                             IMAGE                            COMMAND                  SERVICE              CREATED         STATUS                   PORTS
+pganalytics-c-bypass-collector   pganalytics-c-bypass-collector   "./collector"            c-bypass-collector   5 minutes ago   Up 5 minutes (healthy)   0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp
+pganalytics-postgres             postgres:15-alpine               "docker-entrypoint.s…"   postgres             5 minutes ago   Up 5 minutes (healthy)   0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp
+
+=== CONTAINERS DOCKER ===
+9d7b91a30ef3   pganalytics-c-bypass-collector   "./collector"            5 minutes ago   Up 5 minutes (healthy)   0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp   pganalytics-c-bypass-collector
+fb084de9c504   postgres:15-alpine               "docker-entrypoint.s…"   5 minutes ago   Up 5 minutes (healthy)   0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp   pganalytics-postgres
+
+=== 2. LOGS DO COLETOR ===
+Starting multi-tenant C collector...
+
+=== 3. LOGS DO POSTGRES ===
+
+PostgreSQL Database directory appears to contain a database; Skipping initialization
+
+2025-09-10 14:51:59.348 UTC [1] LOG:  starting PostgreSQL 15.14 on aarch64-unknown-linux-musl, compiled by gcc (Alpine 14.2.0) 14.2.0, 64-bit
+2025-09-10 14:51:59.348 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2025-09-10 14:51:59.348 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+2025-09-10 14:51:59.349 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2025-09-10 14:51:59.350 UTC [30] LOG:  database system was shut down at 2025-09-10 14:51:40 UTC
+2025-09-10 14:51:59.352 UTC [1] LOG:  database system is ready to accept connections
+2025-09-10 14:56:59.368 UTC [28] LOG:  checkpoint starting: time
+2025-09-10 14:56:59.387 UTC [28] LOG:  checkpoint complete: wrote 3 buffers (0.0%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.005 s, sync=0.002 s, total=0.019 s; sync files=2, longest=0.001 s, average=0.001 s; distance=0 kB, estimate=0 kB
+
+=== 4. VERIFICAÇÃO DE PORTAS ===
+netstat: option requires an argument -- p
+Usage:	netstat [-AaLlnW] [-f address_family | -p protocol]
+	netstat [-gilns] [-f address_family]
+	netstat -i | -I interface [-w wait] [-abdgRtS]
+	netstat -s [-s] [-f address_family | -p protocol] [-w wait]
+	netstat -i | -I interface -s [-f address_family | -p protocol]
+	netstat -m [-m]
+	netstat -r [-Aaln] [-f address_family]
+	netstat -rs [-s]
+
+
+=== 5. TESTE DE CONECTIVIDADE ===
+[0;34m[11:57:37][0m Testando PostgreSQL...
+localhost:5432 - accepting connections
+[0;32m✅ PostgreSQL OK[0m
+[0;34m[11:57:37][0m Testando coletor HTTP...
+[0;32m✅ Coletor HTTP OK[0m
+--- Sample das métricas ---
+# Multi-tenant PostgreSQL metrics
+pganalytics_info{version="1.0"} 1
+
+pganalytics_total_connections{tenant="postgres"} 1
+pganalytics_active_connections{tenant="postgres"} 1
+pganalytics_cache_hit_ratio{tenant="postgres"} 0.00
+pganalytics_database_size_bytes{tenant="postgres"} 7656239
+pganalytics_database_connected{tenant="postgres"} 1
+pganalytics_total_connections{tenant="pganalytics"} 1
+pganalytics_active_connections{tenant="pganalytics"} 1
+
+=== 6. INFORMAÇÕES DO CONTAINER DO COLETOR ===
+[0;34m[11:57:37][0m Container encontrado: pganalytics-c-bypass-collector
+--- Processos no container ---
+PID   USER     TIME  COMMAND
+    1 collecto  0:00 ./collector
+   68 collecto  0:00 ps aux
+--- Arquivos do app ---
+total 284
+drwxr-xr-x    1 root     root          4096 Sep 10 14:51 .
+drwxr-xr-x    1 root     root          4096 Sep 10 14:51 ..
+-rw-------    1 root     root           402 Sep 10 03:43 Dockerfile
+-rw-------    1 root     root           216 Sep 10 03:43 Makefile
+-rw-r--r--    1 root     root           592 Sep 10 03:10 Makefile.enhanced
+-rw-------    1 root     root          2398 Sep 10  2025 README_METRICS_FIX.md
+-rw-------    1 root     root          2655 Sep 10  2025 apply_metrics_fix.sh
+-rwxr-xr-x    1 collecto collecto     74664 Sep 10 14:51 collector
+drwxr-xr-x    2 root     root          4096 Sep 10 14:51 config
+drwxr-xr-x    2 root     root          4096 Aug 31 01:33 docs
+-rw-------    1 root     root          3420 Sep 10  2025 export_metrics_prometheus_fixed.c
+-rw-------    1 root     root          9899 Sep 10 03:43 main.c
+-rw-r--r--    1 root     root         13719 Sep 10 00:13 main.c.backup
+-rw-r--r--    1 root     root         17391 Aug 31 01:33 main.c.backup-20250830-223359
+-rw-r--r--    1 root     root         13998 Aug 31 01:37 main.c.backup-20250830-223707
+-rw-r--r--    1 root     root         10108 Aug 31 02:00 main.c.backup-encoding-20250830-230004
+-rw-r--r--    1 root     root          6898 Aug 31 01:02 main.c.backup.20250830_220246
+-rw-r--r--    1 root     root         13998 Aug 31 01:54 main.c.backup.20250830_225417
+-rw-r--r--    1 root     root         10168 Aug 31 01:29 main.c.pre-swagger
+-rw-r--r--    1 root     root         10108 Aug 31 01:06 main.c.with-emojis-broken
+-rw-r--r--    1 root     root         13203 Sep 10 03:10 main_enhanced.c
+-rw-r--r--    1 root     root         13203 Sep 10 14:40 main_enhanced.c.backup-20250910-114052
+-rw-------    1 root     root          1418 Sep 10  2025 struct_postgresql_metrics_complete.h
+-rw-------    1 root     root          4449 Sep 10  2025 test_metrics_fix.sh
+--- Verificação do binário ---
+OCI runtime exec failed: exec failed: unable to start container process: exec: "file": executable file not found in $PATH: unknown
+[1;33m⚠️  Binário não encontrado[0m
+--- Teste manual do coletor ---
+Starting multi-tenant C collector...
+
+=== 7. DOCKER COMPOSE ===
+[0;34m[12:05:53][0m Arquivo docker-compose.yml encontrado
+--- Conteúdo ---
+version: '3.8'
+
+networks:
+  pganalytics_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: pganalytics-postgres
+    environment:
+      POSTGRES_DB: pganalytics
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - pganalytics_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d pganalytics"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  c-bypass-collector:
+    build:
+      context: monitoring/c-collector
+      dockerfile: Dockerfile
+    container_name: pganalytics-c-bypass-collector
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: pganalytics
+      DB_USER: admin
+      DB_PASSWORD: admin123
+    ports:
+      - "8080:8080"
+    networks:
+      - pganalytics_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+=== 8. ARQUIVOS DE CONFIGURAÇÃO ===
+Arquivo encontrado: ./docker-compose.enhanced.yml
+Arquivo encontrado: ./pganalytics-enhanced-v2/docker-compose.yml
+Arquivo encontrado: ./docker/compose/otel.yml
+Arquivo encontrado: ./docker/compose/bypass.yml
+Arquivo encontrado: ./docker/compose/production.yml
+Arquivo encontrado: ./docker/compose/monitoring.yml
+Arquivo encontrado: ./docker/compose/integrated.yml
+Arquivo encontrado: ./pganalytics-v2/monitoring/alertmanager/alertmanager_extensions.yml
+Arquivo encontrado: ./pganalytics-v2/monitoring/alertmanager/alertmanager.yml
+Arquivo encontrado: ./pganalytics-v2/monitoring/grafana/provisioning/datasources/prometheus.yaml
+
+[0;34m[12:05:53][0m Diagnóstico concluído! Resultado salvo em: diagnostic_20250910_115736.txt
+
+🎯 RESUMO EXECUTIVO
+==================
+PostgreSQL Container: ✅
+Collector Container: ✅
+HTTP Endpoint: ✅
+[0;32m✅ TUDO FUNCIONANDO! Execute: curl http://localhost:8080/metrics[0m

@@ -1,0 +1,29 @@
+FROM alpine:3.18
+
+RUN apk add --no-cache \
+    gcc \
+    musl-dev \
+    postgresql-dev \
+    postgresql-client \
+    libpq \
+    libmicrohttpd-dev \
+    make \
+    pkgconfig \
+    linux-headers
+
+WORKDIR /app
+COPY . .
+
+# Compilar versão BYPASS
+RUN gcc -Wall -Wextra -std=c99 -O2 \
+    -I/usr/include/postgresql \
+    -o pg_c_bypass_collector \
+    main-prometheus.c \
+    -lpq -lmicrohttpd
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/metrics || exit 1
+
+CMD ["./pg_c_bypass_collector"]

@@ -1,0 +1,44 @@
+{
+  "timestamp": "2025-09-10T12:10:05-03:00",
+  "tests": {
+    "collector_connectivity": true,
+    "prometheus_connectivity": false,
+    "grafana_connectivity": false,
+    "metrics_validation": true,
+    "found_metrics": [
+      pg_up
+,
+      pg_connections_active
+,
+      pg_connections_idle
+,
+      pg_connections_max
+,
+      pg_query_duration_seconds
+,
+      pg_locks_count
+,
+      pg_replication_lag_bytes
+,
+      pg_database_size_bytes
+,
+      pg_table_size_bytes
+,
+      pg_index_size_bytes
+,
+      pg_cache_hit_ratio
+,
+      pg_checkpoint_time_seconds
+,
+      pg_wal_files_count
+,
+      pg_slow_queries_count
+
+    ],
+    metrics_found_count: 14,
+    metrics_expected_count: 14,
+    response_time_seconds: .018629000,
+    logs_directory: logs_20250910_121015,
+    "validation_completed": true
+  }
+}
