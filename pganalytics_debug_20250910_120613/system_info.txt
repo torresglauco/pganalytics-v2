@@ -1,5 +1,0 @@
-=== INFORMAÇÕES GERAIS ===
-Qua 10 Set 2025 12:06:13 -03
-Darwin 19978-MB.local 24.6.0 Darwin Kernel Version 24.6.0: Mon Jul 14 11:29:54 PDT 2025; root:xnu-11417.140.69~1/RELEASE_ARM64_T8122 arm64
-Docker version 28.3.3, build 980b856816
-Docker Compose version 2.39.2

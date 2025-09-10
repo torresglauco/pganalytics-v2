@@ -1,3 +1,0 @@
-CONTAINER ID   IMAGE                            COMMAND                  CREATED          STATUS                    PORTS                                         NAMES
-9d7b91a30ef3   pganalytics-c-bypass-collector   "./collector"            14 minutes ago   Up 14 minutes (healthy)   0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp   pganalytics-c-bypass-collector
-fb084de9c504   postgres:15-alpine               "docker-entrypoint.s…"   14 minutes ago   Up 14 minutes (healthy)   0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp   pganalytics-postgres

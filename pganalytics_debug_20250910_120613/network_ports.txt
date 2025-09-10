@@ -1,1 +1,0 @@
-collect_debug_data.sh: line 52: ss: command not found

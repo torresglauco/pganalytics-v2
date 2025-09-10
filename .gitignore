@@ -1,79 +1,80 @@
-# 🔒 PG Analytics v2 - .gitignore Enterprise
-# ==========================================
-
-# ARQUIVOS SENSÍVEIS - NUNCA COMMITAR
-.env
-.env.*
-!.env.example
-secrets/
-private/
-*.pem
-*.key
-*.p12
-*.pfx
-*.credentials
-CREDENCIAIS_*.txt
-credentials_*.txt
-auth_*.json
-service_account*.json
-*.crt
-*.cer
-
-# BUILD E DEPENDÊNCIAS
-vendor/
+# Binaries
 *.exe
+*.exe~
 *.dll
 *.so
 *.dylib
-*.test
-*.out
-bin/
-dist/
-coverage.out
-node_modules/
-__pycache__/
-*.py[cod]
-.Python
-build/
-*.egg-info/
-.venv/
-env/
-venv/
+pganalytics-v2
 
-# IDEs E EDITORES
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# Go workspace file
+go.work
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+log/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
+
+# IDE files
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+
+# OS generated files
 .DS_Store
+.DS_Store?
 ._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 
-# TEMPORÁRIOS E LOGS
-*.log
-logs/
-*.tmp
-*.temp
-.cache/
+# Docker
+.dockerignore
+
+# Backup files
 *.backup
-*.bak
-*.old
-*-FIXED
-*-temp
-temp/
-tmp/
+*_backup_*
+backup_*/
+repository_backup_*/
 
-# DOCKER E DADOS
-docker-compose.override.yml
-prometheus_data/
-grafana_data/
-pgdata/
-postgres_data/
+# Diagnostic and debug files
+diagnostic_*.txt
+metrics_*.txt
+validation_results_*.json
+debug_*.tar.gz
+pganalytics_debug_*/
 
-# DESENVOLVIMENTO
-.air.toml
-air_tmp/
-debug
-*.prof
-pprof/
+# Timestamped directories
+logs_20*/
+logs_enhanced_*/
+
+# Node modules (if any JS tools)
+node_modules/
+
+# Build directories
+build/
+dist/
