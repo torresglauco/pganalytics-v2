@@ -1,0 +1,25 @@
+FROM alpine:3.18
+
+RUN apk add --no-cache \
+    gcc musl-dev postgresql-dev postgresql-client \
+    postgresql-contrib make curl ca-certificates
+
+WORKDIR /app
+COPY monitoring/c-collector/ .
+
+RUN gcc -Wall -Wextra -std=c99 \
+    -I/usr/include/postgresql \
+    -O2 -DENHANCED_METRICS \
+    -o collector main_enhanced.c \
+    -lpq -lpthread
+
+RUN adduser -D -s /bin/sh collector && \
+    chown collector:collector /app/collector
+
+USER collector
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=15s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+CMD ["./collector"]

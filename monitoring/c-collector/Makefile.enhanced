@@ -1,0 +1,23 @@
+CC=gcc
+CFLAGS=-Wall -Wextra -std=c99 -I/usr/include/postgresql
+CFLAGS_RELEASE=-O2 -DNDEBUG -DENHANCED_METRICS
+LIBS=-lpq -lpthread
+TARGET=collector
+SOURCE_ENHANCED=main_enhanced.c
+
+all: enhanced
+
+enhanced: $(SOURCE_ENHANCED)
+	$(CC) $(CFLAGS) $(CFLAGS_RELEASE) -o $(TARGET) $(SOURCE_ENHANCED) $(LIBS)
+
+clean:
+	rm -f $(TARGET)
+
+test: enhanced
+	@echo "Testing enhanced collector..."
+	@./$(TARGET) &
+	@sleep 2
+	@curl -s http://localhost:8080/health > /dev/null && echo "✅ Health check: PASSED" || echo "❌ Health check: FAILED"
+	@pkill -f "./$(TARGET)" || true
+
+.PHONY: all enhanced clean test

@@ -1,0 +1,82 @@
+# EXTENSÕES para alertmanager.yml
+# Adicionar estas configurações ao seu alertmanager.yml existente
+
+route:
+  routes:
+    # Alertas críticos de performance
+    - match:
+        component: query_performance
+      receiver: 'performance-alerts'
+      
+    - match:
+        component: lock_analysis  
+      receiver: 'critical-alerts'
+      
+    - match:
+        component: replication
+      receiver: 'replication-alerts'
+      
+    - match:
+        component: maintenance
+      receiver: 'maintenance-alerts'
+
+receivers:
+  - name: 'performance-alerts'
+    email_configs:
+      - to: 'dba-team@yourcompany.com'
+        subject: '⚡ PostgreSQL Performance Alert: {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        body: |
+          🚨 PERFORMANCE ALERT
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Tenant: {{ .Labels.tenant }}
+          Severity: {{ .Labels.severity }}
+          Component: {{ .Labels.component }}
+          Time: {{ .StartsAt }}
+          {{ end }}
+
+  - name: 'critical-alerts'
+    email_configs:
+      - to: 'oncall-team@yourcompany.com'
+        subject: '🔥 CRITICAL: PostgreSQL Lock Issue: {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        body: |
+          🔥 CRITICAL LOCK CONTENTION
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Tenant: {{ .Labels.tenant }}
+          Time: {{ .StartsAt }}
+          
+          ACTION REQUIRED: Check for blocking queries immediately!
+          {{ end }}
+
+  - name: 'replication-alerts'
+    email_configs:
+      - to: 'infrastructure-team@yourcompany.com'  
+        subject: '🔄 Replication Alert: {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        body: |
+          🔄 REPLICATION ISSUE
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Tenant: {{ .Labels.tenant }}
+          Time: {{ .StartsAt }}
+          {{ end }}
+
+  - name: 'maintenance-alerts'
+    email_configs:
+      - to: 'maintenance-team@yourcompany.com'
+        subject: '🛠️ Maintenance Required: {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        body: |
+          🛠️ MAINTENANCE NOTIFICATION
+          
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Tenant: {{ .Labels.tenant }}
+          Time: {{ .StartsAt }}
+          {{ end }}

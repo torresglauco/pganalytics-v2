@@ -1,0 +1,5 @@
+CONTAINER ID   IMAGE                               COMMAND                  CREATED          STATUS                             PORTS                                         NAMES
+35f31c47abe8   pganalytics-v2-c-bypass-collector   "./collector"            48 seconds ago   Up 47 seconds (health: starting)   0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp   pganalytics-c-bypass-collector
+161aa76c0745   postgres:15                         "docker-entrypoint.s…"   48 seconds ago   Up 47 seconds (healthy)            0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp   pganalytics-postgres
+600e77b2e148   prom/prometheus:latest              "/bin/prometheus --c…"   48 seconds ago   Up 47 seconds                      0.0.0.0:9090->9090/tcp, [::]:9090->9090/tcp   pganalytics-v2-prometheus-1
+503108746af7   grafana/grafana:latest              "/run.sh"                48 seconds ago   Up 47 seconds                      0.0.0.0:3000->3000/tcp, [::]:3000->3000/tcp   pganalytics-v2-grafana-1

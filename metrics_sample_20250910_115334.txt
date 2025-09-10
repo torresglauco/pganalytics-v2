@@ -1,0 +1,13 @@
+# Multi-tenant PostgreSQL metrics
+pganalytics_info{version="1.0"} 1
+
+pganalytics_total_connections{tenant="postgres"} 1
+pganalytics_active_connections{tenant="postgres"} 1
+pganalytics_cache_hit_ratio{tenant="postgres"} 0.00
+pganalytics_database_size_bytes{tenant="postgres"} 7656239
+pganalytics_database_connected{tenant="postgres"} 1
+pganalytics_total_connections{tenant="pganalytics"} 1
+pganalytics_active_connections{tenant="pganalytics"} 1
+pganalytics_cache_hit_ratio{tenant="pganalytics"} 0.00
+pganalytics_database_size_bytes{tenant="pganalytics"} 7656239
+pganalytics_database_connected{tenant="pganalytics"} 1

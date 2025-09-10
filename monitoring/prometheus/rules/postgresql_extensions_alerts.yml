@@ -1,0 +1,99 @@
+# EXTENSÕES para prometheus/rules/postgresql_alerts.yml
+# Adicionar estas regras ao arquivo existente
+
+groups:
+  - name: postgresql_performance_alerts
+    rules:
+      # Query Performance Alerts
+      - alert: HighSlowQueries
+        expr: pg_slow_queries > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: query_performance
+        annotations:
+          summary: "High number of slow queries detected"
+          description: "{{ $value }} slow queries detected on {{ $labels.tenant }}"
+
+      - alert: VerySlowQueryDetected  
+        expr: pg_max_query_time_ms > 30000
+        for: 2m
+        labels:
+          severity: critical
+          component: query_performance
+        annotations:
+          summary: "Very slow query detected"
+          description: "Query taking {{ $value }}ms detected on {{ $labels.tenant }}"
+
+      # Lock Contention Alerts
+      - alert: HighLockContention
+        expr: pg_waiting_locks > 5
+        for: 2m
+        labels:
+          severity: critical
+          component: lock_analysis
+        annotations:
+          summary: "High lock contention detected"
+          description: "{{ $value }} queries waiting for locks on {{ $labels.tenant }}"
+
+      - alert: DeadlockDetected
+        expr: increase(pg_deadlocks_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          component: lock_analysis
+        annotations:
+          summary: "Deadlock detected"
+          description: "Deadlock detected on {{ $labels.tenant }}"
+
+      # Replication Alerts
+      - alert: ReplicationLag
+        expr: pg_max_wal_lag_bytes > 100 * 1024 * 1024  # 100MB
+        for: 5m
+        labels:
+          severity: warning
+          component: replication
+        annotations:
+          summary: "High replication lag"
+          description: "Replication lag of {{ $value | humanize1024 }}B on {{ $labels.tenant }}"
+
+      - alert: ReplicationSlotInactive
+        expr: pg_active_replication_slots == 0 and pg_is_standby == 0
+        for: 10m
+        labels:
+          severity: warning
+          component: replication
+        annotations:
+          summary: "No active replication slots"
+          description: "Primary database {{ $labels.tenant }} has no active replication"
+
+      # Database Growth Alerts
+      - alert: LowCacheHitRatio
+        expr: pg_cache_hit_ratio < 95
+        for: 10m
+        labels:
+          severity: warning
+          component: performance
+        annotations:
+          summary: "Low cache hit ratio"
+          description: "Cache hit ratio is {{ $value }}% on {{ $labels.tenant }}"
+
+      - alert: TablesNeedVacuum
+        expr: pg_tables_need_vacuum > 5
+        for: 30m
+        labels:
+          severity: info
+          component: maintenance
+        annotations:
+          summary: "Tables need vacuum"
+          description: "{{ $value }} tables need vacuum on {{ $labels.tenant }}"
+
+      - alert: DatabaseGrowthHigh
+        expr: increase(pg_database_size_bytes[1h]) > 1 * 1024 * 1024 * 1024  # 1GB/hour
+        for: 2h
+        labels:
+          severity: info
+          component: growth
+        annotations:
+          summary: "High database growth rate"
+          description: "Database {{ $labels.tenant }} growing rapidly"

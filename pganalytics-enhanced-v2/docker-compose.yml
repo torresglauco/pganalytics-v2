@@ -1,0 +1,10 @@
+version: '3.8'
+services:
+  pg-collector:
+    build: ./monitoring/c-collector
+    ports:
+      - "9090:9090"
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_USER=postgres  
+      - POSTGRES_PASSWORD=your_password_here
